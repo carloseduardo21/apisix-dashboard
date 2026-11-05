@@ -61,7 +61,9 @@ function GatewayIndicator() {
       <Badge
         variant="light"
         color={ok ? 'teal' : 'red'}
-        leftSection={<Indicator color={ok ? 'teal' : 'red'} size={7} processing={ok} position="middle-center" children={null} />}
+        leftSection={
+          <Indicator color={ok ? 'teal' : 'red'} size={7} processing={ok} position="middle-center" children={null} />
+        }
         visibleFrom="sm"
         styles={{ section: { width: 12, display: 'flex', justifyContent: 'center' } }}
       >
@@ -88,7 +90,13 @@ export function Layout() {
   )
 
   const actions: SpotlightActionData[] = [
-    { id: 'home', label: 'Visão geral', description: 'Status do gateway e resumo', onClick: () => void navigate('/'), leftSection: <IconGauge size={20} stroke={1.5} /> },
+    {
+      id: 'home',
+      label: 'Visão geral',
+      description: 'Status do gateway e resumo',
+      onClick: () => void navigate('/'),
+      leftSection: <IconGauge size={20} stroke={1.5} />,
+    },
     ...RESOURCES.map((r) => ({
       id: `go-${r.key}`,
       label: r.label,
@@ -129,11 +137,28 @@ export function Layout() {
       : []),
     ...(isAdmin(me.role)
       ? [
-          { id: 'users', label: 'Usuários', description: 'Acessos à dashboard', onClick: () => navigate('/usuarios'), leftSection: <IconUserShield size={20} stroke={1.5} /> },
-          { id: 'audit', label: 'Auditoria', description: 'Trilha de eventos', onClick: () => navigate('/auditoria'), leftSection: <IconHistory size={20} stroke={1.5} /> },
+          {
+            id: 'users',
+            label: 'Usuários',
+            description: 'Acessos à dashboard',
+            onClick: () => navigate('/usuarios'),
+            leftSection: <IconUserShield size={20} stroke={1.5} />,
+          },
+          {
+            id: 'audit',
+            label: 'Auditoria',
+            description: 'Trilha de eventos',
+            onClick: () => navigate('/auditoria'),
+            leftSection: <IconHistory size={20} stroke={1.5} />,
+          },
         ]
       : []),
-    { id: 'password', label: 'Alterar senha', onClick: () => void navigate('/conta'), leftSection: <IconKey size={20} stroke={1.5} /> },
+    {
+      id: 'password',
+      label: 'Alterar senha',
+      onClick: () => void navigate('/conta'),
+      leftSection: <IconKey size={20} stroke={1.5} />,
+    },
     {
       id: 'theme',
       label: scheme === 'dark' ? 'Tema claro' : 'Tema escuro',
@@ -143,7 +168,11 @@ export function Layout() {
   ]
 
   return (
-    <AppShell header={{ height: 60 }} navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="lg">
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{ width: 260, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      padding="lg"
+    >
       <AppShell.Header className={classes.header}>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
@@ -166,7 +195,12 @@ export function Layout() {
             </UnstyledButton>
             <GatewayIndicator />
             <Tooltip label={scheme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
-              <ActionIcon variant="default" size={34} onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')} aria-label="Alternar tema">
+              <ActionIcon
+                variant="default"
+                size={34}
+                onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}
+                aria-label="Alternar tema"
+              >
                 {scheme === 'dark' ? <IconSun size={18} stroke={1.6} /> : <IconMoon size={18} stroke={1.6} />}
               </ActionIcon>
             </Tooltip>

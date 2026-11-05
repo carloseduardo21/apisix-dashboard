@@ -52,7 +52,19 @@ function matches(filter: Filter, a: Action) {
   return true
 }
 
-function Stat({ icon: I, label, total, migrated, blocked }: { icon: Icon; label: string; total: number; migrated: number; blocked: number }) {
+function Stat({
+  icon: I,
+  label,
+  total,
+  migrated,
+  blocked,
+}: {
+  icon: Icon
+  label: string
+  total: number
+  migrated: number
+  blocked: number
+}) {
   return (
     <Card padding="md">
       <Group gap="sm" wrap="nowrap">
@@ -83,7 +95,9 @@ function Stat({ icon: I, label, total, migrated, blocked }: { icon: Icon; label:
 }
 
 function Notes({ items }: { items: PlanItem[] }) {
-  const notes = items.flatMap((i) => i.notes.map((n) => ({ ...n, message: items.length > 1 ? `${kindPrefix(i)}${n.message}` : n.message })))
+  const notes = items.flatMap((i) =>
+    i.notes.map((n) => ({ ...n, message: items.length > 1 ? `${kindPrefix(i)}${n.message}` : n.message })),
+  )
   return <NoteList notes={notes} />
 }
 
@@ -240,7 +254,12 @@ function ItemTable({
             <Table.Tr>
               <Table.Th w={36}>
                 <Tooltip label={`Selecionar todos os ${items.length} (filtrados)`}>
-                  <Checkbox checked={allOn} indeterminate={!allOn && someOn} onChange={() => setMany(ids, !allOn)} aria-label="Selecionar todos" />
+                  <Checkbox
+                    checked={allOn}
+                    indeterminate={!allOn && someOn}
+                    onChange={() => setMany(ids, !allOn)}
+                    aria-label="Selecionar todos"
+                  />
                 </Tooltip>
               </Table.Th>
               <Table.Th>{label}</Table.Th>
@@ -252,7 +271,11 @@ function ItemTable({
             {shown.map((it) => (
               <Table.Tr key={it.kong_id} style={{ verticalAlign: 'top' }}>
                 <Table.Td>
-                  <Checkbox checked={selected.includes(it.kong_id)} onChange={() => toggle(it.kong_id)} aria-label={`Selecionar ${it.kong_name}`} />
+                  <Checkbox
+                    checked={selected.includes(it.kong_id)}
+                    onChange={() => toggle(it.kong_id)}
+                    aria-label={`Selecionar ${it.kong_name}`}
+                  />
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" fw={600}>
@@ -320,7 +343,11 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
   }, [plan])
 
   const q = query.trim().toLowerCase()
-  const hit = (i: PlanItem) => !q || i.kong_name.toLowerCase().includes(q) || (i.detail ?? '').toLowerCase().includes(q) || i.id.toLowerCase().includes(q)
+  const hit = (i: PlanItem) =>
+    !q ||
+    i.kong_name.toLowerCase().includes(q) ||
+    (i.detail ?? '').toLowerCase().includes(q) ||
+    i.id.toLowerCase().includes(q)
   const credsOf = (c: PlanItem) => credentials.filter((x) => x.parent === c.kong_id)
 
   const visibleGroups = groups.filter((g) => {
@@ -328,13 +355,18 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
     return all.some(hit) && matches(filter, groupAction(all))
   })
   const visibleOrphans = orphans.filter((i) => hit(i) && matches(filter, i.action))
-  const visibleConsumers = consumers.filter((c) => (hit(c) || credsOf(c).some(hit)) && matches(filter, groupAction([c, ...credsOf(c)])))
+  const visibleConsumers = consumers.filter(
+    (c) => (hit(c) || credsOf(c).some(hit)) && matches(filter, groupAction([c, ...credsOf(c)])),
+  )
   const visibleGlobals = globals.filter((i) => hit(i) && matches(filter, i.action))
 
   const toggleIn = (key: keyof Selection, id: string) =>
     setSelection((s) => ({ ...s, [key]: s[key].includes(id) ? s[key].filter((x) => x !== id) : [...s[key], id] }))
   const setMany = (key: keyof Selection) => (ids: string[], on: boolean) =>
-    setSelection((s) => ({ ...s, [key]: on ? [...new Set([...s[key], ...ids])] : s[key].filter((x) => !ids.includes(x)) }))
+    setSelection((s) => ({
+      ...s,
+      [key]: on ? [...new Set([...s[key], ...ids])] : s[key].filter((x) => !ids.includes(x)),
+    }))
   const toggleService = (id: string) => {
     const routeIds = groups.find((g) => g.service.kong_id === id)?.routes.map((r) => r.kong_id) ?? []
     setSelection((s) => ({
@@ -350,7 +382,8 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
     migrated: items.filter((i) => i.action === 'unchanged').length,
     blocked: items.filter((i) => i.action === 'blocked').length,
   })
-  const nSel = selection.services.length + selection.routes.length + selection.consumers.length + selection.globals.length
+  const nSel =
+    selection.services.length + selection.routes.length + selection.consumers.length + selection.globals.length
 
   return (
     <Stack pb={nSel ? 80 : 0}>
@@ -386,12 +419,21 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
           Services e rotas
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Selecionar um service leva o upstream, os plugins e todas as rotas dele. Para migrar só algumas rotas, abra o service e marque as rotas.
+          Selecionar um service leva o upstream, os plugins e todas as rotas dele. Para migrar só algumas rotas, abra o
+          service e marque as rotas.
         </Text>
         <Stack gap="xs">
-          {visibleGroups.length === 0 && <EmptyState icon={IconServer} title="Nenhum service" description="Nada corresponde ao filtro." />}
+          {visibleGroups.length === 0 && (
+            <EmptyState icon={IconServer} title="Nenhum service" description="Nada corresponde ao filtro." />
+          )}
           {visibleGroups.map((g) => (
-            <ServiceRow key={g.service.kong_id} g={g} selection={selection} toggleService={toggleService} toggleRoute={(id) => toggleIn('routes', id)} />
+            <ServiceRow
+              key={g.service.kong_id}
+              g={g}
+              selection={selection}
+              toggleService={toggleService}
+              toggleRoute={(id) => toggleIn('routes', id)}
+            />
           ))}
         </Stack>
         {visibleOrphans.length > 0 && (
@@ -399,7 +441,13 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
             <Title order={5} mt="lg" mb="xs">
               Rotas sem service
             </Title>
-            <ItemTable items={visibleOrphans} label="Rota" selected={selection.routes} toggle={(id) => toggleIn('routes', id)} setMany={setMany('routes')} />
+            <ItemTable
+              items={visibleOrphans}
+              label="Rota"
+              selected={selection.routes}
+              toggle={(id) => toggleIn('routes', id)}
+              setMany={setMany('routes')}
+            />
           </>
         )}
       </Card>
@@ -409,7 +457,8 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
           Consumers e credenciais
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Os grupos de ACL viram o label <b>groups</b> do consumer (lido pelo plugin acl). Migre os consumers antes de ativar as rotas que os autenticam.
+          Os grupos de ACL viram o label <b>groups</b> do consumer (lido pelo plugin acl). Migre os consumers antes de
+          ativar as rotas que os autenticam.
         </Text>
         {visibleConsumers.length === 0 ? (
           <EmptyState icon={IconUsers} title="Nenhum consumer" description="Nada corresponde ao filtro." />
@@ -427,8 +476,17 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
                 <Stack gap={4}>
                   <Group gap={4}>
                     {creds.map((x) => (
-                      <Tooltip key={x.kong_id} label={x.notes.find((n) => n.level !== 'info')?.message ?? x.detail ?? 'credencial'} multiline maw={320}>
-                        <Badge size="xs" variant="light" color={x.action === 'blocked' ? 'red' : x.action === 'unchanged' ? 'teal' : 'indigo'}>
+                      <Tooltip
+                        key={x.kong_id}
+                        label={x.notes.find((n) => n.level !== 'info')?.message ?? x.detail ?? 'credencial'}
+                        multiline
+                        maw={320}
+                      >
+                        <Badge
+                          size="xs"
+                          variant="light"
+                          color={x.action === 'blocked' ? 'red' : x.action === 'unchanged' ? 'teal' : 'indigo'}
+                        >
                           {x.kong_name.split(' · ').pop()}
                         </Badge>
                       </Tooltip>
@@ -451,7 +509,13 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
         {visibleGlobals.length === 0 ? (
           <EmptyState icon={IconPlugConnected} title="Nenhum plugin global" />
         ) : (
-          <ItemTable items={visibleGlobals} label="Plugin" selected={selection.globals} toggle={(id) => toggleIn('globals', id)} setMany={setMany('globals')} />
+          <ItemTable
+            items={visibleGlobals}
+            label="Plugin"
+            selected={selection.globals}
+            toggle={(id) => toggleIn('globals', id)}
+            setMany={setMany('globals')}
+          />
         )}
       </Card>
 

@@ -11,7 +11,11 @@ const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v == n
 
 function nodes(up: Obj | undefined): string[] {
   const n = up?.nodes
-  if (Array.isArray(n)) return n.map((x) => `${(x as Obj).host}:${(x as Obj).port}${(x as Obj).weight !== undefined ? ` (peso ${(x as Obj).weight})` : ''}`)
+  if (Array.isArray(n))
+    return n.map(
+      (x) =>
+        `${(x as Obj).host}:${(x as Obj).port}${(x as Obj).weight !== undefined ? ` (peso ${(x as Obj).weight})` : ''}`,
+    )
   if (n && typeof n === 'object') return Object.entries(n).map(([k, w]) => `${k} (peso ${w})`)
   if (up?.service_name) return [`${up.discovery_type ?? 'discovery'}: ${up.service_name}`]
   return []
@@ -45,7 +49,14 @@ function Upstream({ service }: { service: Obj }) {
   })
   const up = id ? q.data?.value : (service.upstream as Obj | undefined)
   if (id && q.isPending) return <Skeleton h={60} />
-  if (!up) return id ? <Text size="sm" c="red">upstream {id} não encontrado</Text> : none
+  if (!up)
+    return id ? (
+      <Text size="sm" c="red">
+        upstream {id} não encontrado
+      </Text>
+    ) : (
+      none
+    )
   return (
     <Stack gap={6}>
       <Group gap={6}>
@@ -81,9 +92,15 @@ function Upstream({ service }: { service: Obj }) {
 
 /** Service summary with the routes bound to it. */
 export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
-  const routes = useQuery({ queryKey: ['apisix', 'routes'], queryFn: () => api<AdminList>('GET', '/api/apisix/routes') })
+  const routes = useQuery({
+    queryKey: ['apisix', 'routes'],
+    queryFn: () => api<AdminList>('GET', '/api/apisix/routes'),
+  })
   const bound = useMemo(
-    () => (routes.data?.list ?? []).filter((r) => r.value.service_id === id).map((r) => ({ id: itemId('routes', r), v: r.value })),
+    () =>
+      (routes.data?.list ?? [])
+        .filter((r) => r.value.service_id === id)
+        .map((r) => ({ id: itemId('routes', r), v: r.value })),
     [routes.data, id],
   )
   const plugins = Object.keys((value.plugins as Obj) ?? {})
@@ -160,7 +177,11 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
         {routes.isPending ? (
           <Skeleton h={120} />
         ) : bound.length === 0 ? (
-          <EmptyState icon={IconRoute} title="Nenhuma route vinculada" description="Routes com service_id igual a este service aparecem aqui." />
+          <EmptyState
+            icon={IconRoute}
+            title="Nenhuma route vinculada"
+            description="Routes com service_id igual a este service aparecem aqui."
+          />
         ) : (
           <Table.ScrollContainer minWidth={480}>
             <Table highlightOnHover verticalSpacing="xs" fz="sm">

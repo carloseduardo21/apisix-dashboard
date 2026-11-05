@@ -13,7 +13,14 @@ export function LogoMark({ size = 30 }: { size?: number }) {
         </linearGradient>
       </defs>
       <path d="M16 2 28 9v14l-12 7-12-7V9z" fill={`url(#${id})`} />
-      <path d="M9 16h6m0 0 5-4.5M15 16l5 4.5" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path
+        d="M9 16h6m0 0 5-4.5M15 16l5 4.5"
+        stroke="#fff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
       <circle cx="22" cy="11" r="2" fill="#fff" />
       <circle cx="22" cy="21" r="2" fill="#fff" />
     </svg>

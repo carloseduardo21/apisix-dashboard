@@ -124,7 +124,12 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       return api('PUT', `/api/apisix/${def.key}/${id}`, value)
     },
     onSuccess: () => {
-      notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Salvo', message: `${def.singular} salvo com sucesso` })
+      notifications.show({
+        color: 'teal',
+        icon: <IconCheck size={18} />,
+        title: 'Salvo',
+        message: `${def.singular} salvo com sucesso`,
+      })
       void qc.invalidateQueries({ queryKey })
     },
   })
@@ -132,10 +137,15 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
   const remove = useMutation({
     mutationFn: (id: string) => api('DELETE', `/api/apisix/${def.key}/${id}`),
     onSuccess: () => {
-      notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Excluído', message: `${def.singular} excluído` })
+      notifications.show({
+        color: 'teal',
+        icon: <IconCheck size={18} />,
+        title: 'Excluído',
+        message: `${def.singular} excluído`,
+      })
       void qc.invalidateQueries({ queryKey })
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: e.message }),
   })
 
   const confirmDelete = (id: string) =>
@@ -143,7 +153,8 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       title: <Text fw={600}>Excluir {def.singular}</Text>,
       children: (
         <Text size="sm">
-          Tem certeza que deseja excluir <Code>{id}</Code>? A alteração é aplicada imediatamente no gateway e fica registrada na auditoria.
+          Tem certeza que deseja excluir <Code>{id}</Code>? A alteração é aplicada imediatamente no gateway e fica
+          registrada na auditoria.
         </Text>
       ),
       labels: { confirm: 'Excluir', cancel: 'Cancelar' },
@@ -151,7 +162,8 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       onConfirm: () => remove.mutate(id),
     })
 
-  const openEdit = (item: AdminItem) => setEditing({ mode: 'edit', id: itemId(def.key, item), value: editable(item.value) })
+  const openEdit = (item: AdminItem) =>
+    setEditing({ mode: 'edit', id: itemId(def.key, item), value: editable(item.value) })
   // A click opens the editor; services open their summary (with routes), and
   // read-only users or dashboard-managed SSLs get the read-only view.
   const openRow = (item: AdminItem) => {
@@ -184,12 +196,13 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
 
       {isStreamDisabled(error) ? (
         <Alert color="gray" icon={<IconAlertCircle size={16} />} title="Modo stream desativado" mb="md">
-          Habilite <code>apisix.proxy_mode: http&stream</code> e <code>stream_proxy</code> no config.yaml do APISIX para usar stream routes.
+          Habilite <code>apisix.proxy_mode: http&stream</code> e <code>stream_proxy</code> no config.yaml do APISIX para
+          usar stream routes.
         </Alert>
       ) : (
         error && (
           <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar" mb="md">
-            {(error).message}
+            {error.message}
           </Alert>
         )
       )}
@@ -207,7 +220,13 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
             w={320}
           />
           <Tooltip label="Recarregar">
-            <ActionIcon variant="default" size={36} onClick={() => refetch()} loading={isFetching} aria-label="Recarregar">
+            <ActionIcon
+              variant="default"
+              size={36}
+              onClick={() => refetch()}
+              loading={isFetching}
+              aria-label="Recarregar"
+            >
               <IconRefresh size={18} />
             </ActionIcon>
           </Tooltip>
@@ -228,7 +247,11 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
               writable &&
               !filter &&
               !error && (
-                <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setEditing({ mode: 'create' })}>
+                <Button
+                  variant="light"
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => setEditing({ mode: 'create' })}
+                >
                   Criar {def.singular}
                 </Button>
               )
@@ -269,19 +292,29 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                               </Menu.Item>
                             )}
                             {isManagedSSL(def.key, item.value) ? (
-                              <Menu.Item component={Link} to="/certificados" leftSection={<IconCertificate2 size={16} />}>
+                              <Menu.Item
+                                component={Link}
+                                to="/certificados"
+                                leftSection={<IconCertificate2 size={16} />}
+                              >
                                 Certificados automáticos
                               </Menu.Item>
-                            ) : writable && (
-                              <>
-                                <Menu.Item leftSection={<IconEdit size={16} />} onClick={() => openEdit(item)}>
-                                  Editar
-                                </Menu.Item>
-                                <Menu.Divider />
-                                <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={() => confirmDelete(id)}>
-                                  Excluir
-                                </Menu.Item>
-                              </>
+                            ) : (
+                              writable && (
+                                <>
+                                  <Menu.Item leftSection={<IconEdit size={16} />} onClick={() => openEdit(item)}>
+                                    Editar
+                                  </Menu.Item>
+                                  <Menu.Divider />
+                                  <Menu.Item
+                                    color="red"
+                                    leftSection={<IconTrash size={16} />}
+                                    onClick={() => confirmDelete(id)}
+                                  >
+                                    Excluir
+                                  </Menu.Item>
+                                </>
+                              )
                             )}
                           </Menu.Dropdown>
                         </Menu>
@@ -345,26 +378,40 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
               <Group gap="xs">
                 <CopyButton value={JSON.stringify(viewing.value, null, 2)}>
                   {({ copied, copy }) => (
-                    <Button size="xs" variant="default" leftSection={copied ? <IconCheck size={14} /> : <IconCopy size={14} />} onClick={copy}>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                      onClick={copy}
+                    >
                       {copied ? 'Copiado' : 'Copiar JSON'}
                     </Button>
                   )}
                 </CopyButton>
                 {isManagedSSL(def.key, viewing.value) ? (
-                  <Button size="xs" variant="light" color="orange" component={Link} to="/certificados" leftSection={<IconCertificate2 size={14} />}>
-                    Emitido automaticamente
-                  </Button>
-                ) : writable && (
                   <Button
                     size="xs"
-                    leftSection={<IconEdit size={14} />}
-                    onClick={() => {
-                      openEdit(viewing)
-                      setViewing(null)
-                    }}
+                    variant="light"
+                    color="orange"
+                    component={Link}
+                    to="/certificados"
+                    leftSection={<IconCertificate2 size={14} />}
                   >
-                    Editar
+                    Emitido automaticamente
                   </Button>
+                ) : (
+                  writable && (
+                    <Button
+                      size="xs"
+                      leftSection={<IconEdit size={14} />}
+                      onClick={() => {
+                        openEdit(viewing)
+                        setViewing(null)
+                      }}
+                    >
+                      Editar
+                    </Button>
+                  )
                 )}
               </Group>
             </Group>

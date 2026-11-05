@@ -47,7 +47,12 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : 
 
 function Plugins({ v }: { v: Obj }) {
   const names = Object.keys((v.plugins as Obj) ?? {})
-  if (!names.length) return <Text c="dimmed" size="sm">—</Text>
+  if (!names.length)
+    return (
+      <Text c="dimmed" size="sm">
+        —
+      </Text>
+    )
   return (
     <Group gap={4}>
       {names.slice(0, 4).map((n) => (
@@ -55,7 +60,11 @@ function Plugins({ v }: { v: Obj }) {
           {n}
         </Badge>
       ))}
-      {names.length > 4 && <Badge size="sm" variant="outline">+{names.length - 4}</Badge>}
+      {names.length > 4 && (
+        <Badge size="sm" variant="outline">
+          +{names.length - 4}
+        </Badge>
+      )}
     </Group>
   )
 }
@@ -91,9 +100,23 @@ const mono = (s: string) => (
   </Text>
 )
 
-const nameCol: Column = { label: 'Nome', render: (v) => <Text size="sm" fw={500}>{str(v.name) || '—'}</Text> }
+const nameCol: Column = {
+  label: 'Nome',
+  render: (v) => (
+    <Text size="sm" fw={500}>
+      {str(v.name) || '—'}
+    </Text>
+  ),
+}
 const idCol: Column = { label: 'ID', render: (_v, id) => mono(id) }
-const descCol: Column = { label: 'Descrição', render: (v) => <Text size="sm" c="dimmed" lineClamp={1}>{str(v.desc) || '—'}</Text> }
+const descCol: Column = {
+  label: 'Descrição',
+  render: (v) => (
+    <Text size="sm" c="dimmed" lineClamp={1}>
+      {str(v.desc) || '—'}
+    </Text>
+  ),
+}
 const pluginsCol: Column = { label: 'Plugins', render: (v) => <Plugins v={v} /> }
 
 export const RESOURCES: ResourceDef[] = [
@@ -135,10 +158,33 @@ export const RESOURCES: ResourceDef[] = [
     columns: [
       idCol,
       nameCol,
-      { label: 'Balanceamento', render: (v) => <Badge size="sm" variant="light">{str(v.type) || 'roundrobin'}</Badge> },
-      { label: 'Nós', render: (v) => mono(v.service_name ? `${v.discovery_type ?? 'discovery'}: ${v.service_name}` : nodesText(v.nodes)) },
+      {
+        label: 'Balanceamento',
+        render: (v) => (
+          <Badge size="sm" variant="light">
+            {str(v.type) || 'roundrobin'}
+          </Badge>
+        ),
+      },
+      {
+        label: 'Nós',
+        render: (v) =>
+          mono(v.service_name ? `${v.discovery_type ?? 'discovery'}: ${v.service_name}` : nodesText(v.nodes)),
+      },
       { label: 'Esquema', render: (v) => <Text size="sm">{str(v.scheme) || 'http'}</Text> },
-      { label: 'Health check', render: (v) => (v.checks ? <Badge size="sm" color="teal" variant="light">sim</Badge> : <Text size="sm" c="dimmed">—</Text>) },
+      {
+        label: 'Health check',
+        render: (v) =>
+          v.checks ? (
+            <Badge size="sm" color="teal" variant="light">
+              sim
+            </Badge>
+          ) : (
+            <Text size="sm" c="dimmed">
+              —
+            </Text>
+          ),
+      },
     ],
     template: { name: '', type: 'roundrobin', nodes: [{ host: '', port: 80, weight: 1 }] },
     search: (v, id) => [id, v.name, v.desc, nodesText(v.nodes), v.service_name].map(str).join(' '),
@@ -151,7 +197,14 @@ export const RESOURCES: ResourceDef[] = [
     icon: IconUsers,
     create: 'put-body',
     columns: [
-      { label: 'Usuário', render: (v) => <Text size="sm" fw={500}>{str(v.username)}</Text> },
+      {
+        label: 'Usuário',
+        render: (v) => (
+          <Text size="sm" fw={500}>
+            {str(v.username)}
+          </Text>
+        ),
+      },
       descCol,
       { label: 'Grupo', render: (v) => mono(str(v.group_id)) },
       pluginsCol,
@@ -189,14 +242,21 @@ export const RESOURCES: ResourceDef[] = [
               automático
             </Badge>
           ) : (
-            <Text size="sm" c="dimmed">manual</Text>
+            <Text size="sm" c="dimmed">
+              manual
+            </Text>
           ),
       },
       {
         label: 'Validade',
         render: (v) => {
           const end = typeof v.validity_end === 'number' ? new Date(v.validity_end * 1000) : null
-          if (!end) return <Text size="sm" c="dimmed">—</Text>
+          if (!end)
+            return (
+              <Text size="sm" c="dimmed">
+                —
+              </Text>
+            )
           const days = Math.floor((end.getTime() - Date.now()) / 86_400_000)
           const color = days < 0 ? 'red' : days < 30 ? 'orange' : 'green'
           return (
@@ -268,7 +328,11 @@ export const RESOURCES: ResourceDef[] = [
     singular: 'secret manager',
     icon: IconLock,
     create: 'put-id',
-    columns: [idCol, { label: 'URI', render: (v) => mono(str(v.uri)) }, { label: 'Prefixo', render: (v) => mono(str(v.prefix)) }],
+    columns: [
+      idCol,
+      { label: 'URI', render: (v) => mono(str(v.uri)) },
+      { label: 'Prefixo', render: (v) => mono(str(v.prefix)) },
+    ],
     template: {},
     search: (v, id) => [id, v.uri, v.prefix].map(str).join(' '),
   },
@@ -276,5 +340,13 @@ export const RESOURCES: ResourceDef[] = [
 
 export const RESOURCE_BY_KEY = Object.fromEntries(RESOURCES.map((r) => [r.key, r]))
 
-export const MAIN_RESOURCES = ['routes', 'services', 'upstreams', 'consumers', 'ssls', 'plugin_configs', 'global_rules', 'stream_routes']
-
+export const MAIN_RESOURCES = [
+  'routes',
+  'services',
+  'upstreams',
+  'consumers',
+  'ssls',
+  'plugin_configs',
+  'global_rules',
+  'stream_routes',
+]

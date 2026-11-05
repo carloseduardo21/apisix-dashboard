@@ -29,8 +29,16 @@ function errText(e: unknown) {
 
 function Brand() {
   const features = [
-    { icon: IconShieldLock, title: 'MFA obrigatório', text: 'TOTP para todos os acessos, com bloqueio após tentativas inválidas.' },
-    { icon: IconHistory, title: 'Trilha de auditoria', text: 'Toda alteração no gateway registrada com o estado anterior e posterior.' },
+    {
+      icon: IconShieldLock,
+      title: 'MFA obrigatório',
+      text: 'TOTP para todos os acessos, com bloqueio após tentativas inválidas.',
+    },
+    {
+      icon: IconHistory,
+      title: 'Trilha de auditoria',
+      text: 'Toda alteração no gateway registrada com o estado anterior e posterior.',
+    },
     { icon: IconLock, title: 'Segredos protegidos', text: 'Chaves e senhas nunca chegam ao navegador nem aos logs.' },
   ]
   return (
@@ -38,8 +46,12 @@ function Brand() {
       <Group gap="sm">
         <LogoMark size={40} />
         <div>
-          <Text fw={800} size="lg" lh={1.1}>APISIX</Text>
-          <Text size="sm" opacity={0.8} lh={1.1}>Dashboard</Text>
+          <Text fw={800} size="lg" lh={1.1}>
+            APISIX
+          </Text>
+          <Text size="sm" opacity={0.8} lh={1.1}>
+            Dashboard
+          </Text>
         </div>
       </Group>
       <Stack gap="lg" maw={480}>
@@ -57,7 +69,9 @@ function Brand() {
               </ThemeIcon>
               <div>
                 <Text fw={600}>{f.title}</Text>
-                <Text size="sm" opacity={0.8}>{f.text}</Text>
+                <Text size="sm" opacity={0.8}>
+                  {f.text}
+                </Text>
               </div>
             </Group>
           ))}
@@ -217,7 +231,14 @@ function MfaVerifyStep({ onDone }: { onDone: () => void }) {
           onComplete={verify}
           disabled={loading}
         />
-        <Button fullWidth size="md" variant="gradient" loading={loading} disabled={code.length !== 6} onClick={() => verify(code)}>
+        <Button
+          fullWidth
+          size="md"
+          variant="gradient"
+          loading={loading}
+          disabled={code.length !== 6}
+          onClick={() => verify(code)}
+        >
           Verificar
         </Button>
         <LogoutLink onDone={onDone} />
@@ -276,8 +297,23 @@ function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
           </Text>
         )}
         <Text size="sm">Depois, informe o código gerado:</Text>
-        <PinInput length={6} type="number" oneTimeCode value={code} onChange={setCode} onComplete={finish} disabled={loading || !secret} />
-        <Button fullWidth size="md" variant="gradient" loading={loading} disabled={code.length !== 6} onClick={() => finish(code)}>
+        <PinInput
+          length={6}
+          type="number"
+          oneTimeCode
+          value={code}
+          onChange={setCode}
+          onComplete={finish}
+          disabled={loading || !secret}
+        />
+        <Button
+          fullWidth
+          size="md"
+          variant="gradient"
+          loading={loading}
+          disabled={code.length !== 6}
+          onClick={() => finish(code)}
+        >
           Ativar MFA
         </Button>
         <LogoutLink onDone={onDone} />
@@ -286,7 +322,13 @@ function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
   )
 }
 
-export function ChangePasswordForm({ onDone, submitLabel = 'Alterar senha' }: { onDone: () => void; submitLabel?: string }) {
+export function ChangePasswordForm({
+  onDone,
+  submitLabel = 'Alterar senha',
+}: {
+  onDone: () => void
+  submitLabel?: string
+}) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -318,7 +360,13 @@ export function ChangePasswordForm({ onDone, submitLabel = 'Alterar senha' }: { 
     <form onSubmit={submit}>
       <Stack>
         <ErrorAlert error={error} />
-        <PasswordInput label="Senha atual" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.currentTarget.value)} required />
+        <PasswordInput
+          label="Senha atual"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.currentTarget.value)}
+          required
+        />
         <PasswordInput
           label="Nova senha"
           description="Mínimo de 12 caracteres, com letras e números. Não pode repetir as últimas 4."
@@ -327,7 +375,13 @@ export function ChangePasswordForm({ onDone, submitLabel = 'Alterar senha' }: { 
           onChange={(e) => setNext(e.currentTarget.value)}
           required
         />
-        <PasswordInput label="Confirme a nova senha" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.currentTarget.value)} required />
+        <PasswordInput
+          label="Confirme a nova senha"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.currentTarget.value)}
+          required
+        />
         <Button type="submit" loading={loading}>
           {submitLabel}
         </Button>
@@ -338,10 +392,15 @@ export function ChangePasswordForm({ onDone, submitLabel = 'Alterar senha' }: { 
 
 function ChangePasswordStep({ onDone }: { onDone: () => void }) {
   return (
-    <Card title="Troca de senha obrigatória" subtitle="Sua senha foi definida por um administrador. Defina uma nova senha para continuar.">
+    <Card
+      title="Troca de senha obrigatória"
+      subtitle="Sua senha foi definida por um administrador. Defina uma nova senha para continuar."
+    >
       <Stack>
         <ChangePasswordForm onDone={onDone} submitLabel="Salvar e continuar" />
-        <Center><LogoutLink onDone={onDone} /></Center>
+        <Center>
+          <LogoutLink onDone={onDone} />
+        </Center>
       </Stack>
     </Card>
   )

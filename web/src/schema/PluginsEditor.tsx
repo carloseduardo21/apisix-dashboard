@@ -19,13 +19,91 @@ import { JsonField, ObjectFields } from './SchemaForm'
 import { isObj, sensitiveMatcher, setKey, useCatalog, type JSONSchema, type Obj, type PluginInfo } from './types'
 
 const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
-  ['Autenticação', (n, i) => i.type === 'auth' || n.endsWith('-auth') || ['openid-connect', 'authz-keycloak', 'authz-casbin', 'authz-casdoor', 'wolf-rbac', 'opa', 'jwe-decrypt'].includes(n)],
-  ['Segurança', (n) => ['cors', 'csrf', 'uri-blocker', 'consumer-restriction', 'chaitin-waf', 'request-validation', 'public-api', 'gm'].includes(n) || n.endsWith('-restriction')],
-  ['Tráfego', (n) => n.startsWith('limit-') || n.startsWith('traffic-') || ['api-breaker', 'proxy-cache', 'proxy-mirror', 'request-id', 'client-control', 'workflow', 'real-ip', 'proxy-control', 'proxy-buffering', 'graphql-limit-count'].includes(n)],
-  ['Transformação', (n) => n.includes('rewrite') || n.includes('transform') || n.includes('transcode') || ['fault-injection', 'mocking', 'redirect', 'echo', 'degraphql', 'gzip', 'brotli', 'attach-consumer-label', 'inspect'].includes(n)],
-  ['Observabilidade', (n) => n.endsWith('-logger') || n.endsWith('-logging') || ['prometheus', 'zipkin', 'skywalking', 'opentelemetry', 'datadog', 'node-status', 'server-info', 'loggly', 'lago'].includes(n)],
+  [
+    'Autenticação',
+    (n, i) =>
+      i.type === 'auth' ||
+      n.endsWith('-auth') ||
+      ['openid-connect', 'authz-keycloak', 'authz-casbin', 'authz-casdoor', 'wolf-rbac', 'opa', 'jwe-decrypt'].includes(
+        n,
+      ),
+  ],
+  [
+    'Segurança',
+    (n) =>
+      [
+        'cors',
+        'csrf',
+        'uri-blocker',
+        'consumer-restriction',
+        'chaitin-waf',
+        'request-validation',
+        'public-api',
+        'gm',
+      ].includes(n) || n.endsWith('-restriction'),
+  ],
+  [
+    'Tráfego',
+    (n) =>
+      n.startsWith('limit-') ||
+      n.startsWith('traffic-') ||
+      [
+        'api-breaker',
+        'proxy-cache',
+        'proxy-mirror',
+        'request-id',
+        'client-control',
+        'workflow',
+        'real-ip',
+        'proxy-control',
+        'proxy-buffering',
+        'graphql-limit-count',
+      ].includes(n),
+  ],
+  [
+    'Transformação',
+    (n) =>
+      n.includes('rewrite') ||
+      n.includes('transform') ||
+      n.includes('transcode') ||
+      [
+        'fault-injection',
+        'mocking',
+        'redirect',
+        'echo',
+        'degraphql',
+        'gzip',
+        'brotli',
+        'attach-consumer-label',
+        'inspect',
+      ].includes(n),
+  ],
+  [
+    'Observabilidade',
+    (n) =>
+      n.endsWith('-logger') ||
+      n.endsWith('-logging') ||
+      [
+        'prometheus',
+        'zipkin',
+        'skywalking',
+        'opentelemetry',
+        'datadog',
+        'node-status',
+        'server-info',
+        'loggly',
+        'lago',
+      ].includes(n),
+  ],
   ['IA', (n) => n.startsWith('ai')],
-  ['Serverless', (n) => n.startsWith('serverless') || n.startsWith('ext-plugin') || n.includes('function') || ['aws-lambda', 'openwhisk', 'openfunction'].includes(n)],
+  [
+    'Serverless',
+    (n) =>
+      n.startsWith('serverless') ||
+      n.startsWith('ext-plugin') ||
+      n.includes('function') ||
+      ['aws-lambda', 'openwhisk', 'openfunction'].includes(n),
+  ],
 ]
 
 function category(name: string, info: PluginInfo) {
@@ -64,7 +142,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
   if (catalog.error) {
     return (
       <Alert color="red" icon={<IconAlertCircle size={16} />}>
-        Não foi possível carregar os schemas de plugins: {(catalog.error).message}
+        Não foi possível carregar os schemas de plugins: {catalog.error.message}
       </Alert>
     )
   }
@@ -109,12 +187,16 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
         <Accordion multiple value={open} onChange={setOpen} variant="separated" chevronPosition="left">
           {enabled.map((name) => {
             const info = available?.[name]
-            const conf = isObj(plugins[name]) ? (plugins[name]) : {}
+            const conf = isObj(plugins[name]) ? plugins[name] : {}
             const meta = isObj(conf._meta) ? conf._meta : {}
             const disabled = meta.disable === true
-            const schema: JSONSchema | undefined = info && (consumer && info.consumer_schema ? info.consumer_schema : info.schema)
+            const schema: JSONSchema | undefined =
+              info && (consumer && info.consumer_schema ? info.consumer_schema : info.schema)
             const mode = modes[name] ?? (schema ? 'form' : 'json')
-            const sensitive = sensitiveMatcher(schema?.encrypt_fields, consumer ? [] : info?.consumer_schema?.encrypt_fields)
+            const sensitive = sensitiveMatcher(
+              schema?.encrypt_fields,
+              consumer ? [] : info?.consumer_schema?.encrypt_fields,
+            )
 
             return (
               <Accordion.Item key={name} value={name}>
@@ -159,7 +241,12 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                         />
                       </Group>
                       <Group gap="xs">
-                        <Anchor href={`https://apisix.apache.org/docs/apisix/plugins/${name}/`} target="_blank" rel="noreferrer" size="xs">
+                        <Anchor
+                          href={`https://apisix.apache.org/docs/apisix/plugins/${name}/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          size="xs"
+                        >
                           <Group gap={2}>
                             documentação <IconExternalLink size={12} />
                           </Group>

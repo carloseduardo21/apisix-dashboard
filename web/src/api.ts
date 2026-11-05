@@ -123,5 +123,5 @@ export const isAdmin = (role?: Role) => role === 'admin'
 /** Id of an Admin API item, derived from its etcd key ("/apisix/routes/1" → "1"). */
 export function itemId(resource: string, item: AdminItem): string {
   const prefix = `/apisix/${resource}/`
-  return item.key.startsWith(prefix) ? item.key.slice(prefix.length) : item.key.split('/').pop() ?? ''
+  return item.key.startsWith(prefix) ? item.key.slice(prefix.length) : (item.key.split('/').pop() ?? '')
 }

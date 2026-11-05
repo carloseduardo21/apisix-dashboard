@@ -17,7 +17,12 @@
   justify-content: space-between;
   padding: 48px;
   color: var(--mantine-color-white);
-  background: linear-gradient(140deg, var(--mantine-color-indigo-9) 0%, var(--mantine-color-indigo-7) 45%, var(--mantine-color-cyan-7) 100%);
+  background: linear-gradient(
+    140deg,
+    var(--mantine-color-indigo-9) 0%,
+    var(--mantine-color-indigo-7) 45%,
+    var(--mantine-color-cyan-7) 100%
+  );
 
   @media (max-width: $mantine-breakpoint-md) {
     display: none;

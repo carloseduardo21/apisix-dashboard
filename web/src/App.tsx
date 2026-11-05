@@ -36,10 +36,20 @@ function WritersOnly({ children }: { children: React.ReactNode }) {
 function Account() {
   return (
     <>
-      <PageHeader icon={IconKey} title="Alterar senha" description="Ao trocar a senha, suas outras sessões são encerradas." />
+      <PageHeader
+        icon={IconKey}
+        title="Alterar senha"
+        description="Ao trocar a senha, suas outras sessões são encerradas."
+      />
       <Card maw={520}>
         <ChangePasswordForm
-          onDone={() => notifications.show({ color: 'teal', title: 'Senha alterada', message: 'Suas outras sessões foram encerradas.' })}
+          onDone={() =>
+            notifications.show({
+              color: 'teal',
+              title: 'Senha alterada',
+              message: 'Suas outras sessões foram encerradas.',
+            })
+          }
         />
       </Card>
     </>
@@ -55,10 +65,31 @@ export function App() {
             <Route index element={<Overview />} />
             <Route path="r/:resource" element={<ResourceRoute />} />
             <Route path="certificados" element={<Certificates />} />
-            <Route path="migracao/kong" element={<WritersOnly><KongMigration /></WritersOnly>} />
+            <Route
+              path="migracao/kong"
+              element={
+                <WritersOnly>
+                  <KongMigration />
+                </WritersOnly>
+              }
+            />
             <Route path="conta" element={<Account />} />
-            <Route path="usuarios" element={<AdminOnly><Users /></AdminOnly>} />
-            <Route path="auditoria" element={<AdminOnly><Audit /></AdminOnly>} />
+            <Route
+              path="usuarios"
+              element={
+                <AdminOnly>
+                  <Users />
+                </AdminOnly>
+              }
+            />
+            <Route
+              path="auditoria"
+              element={
+                <AdminOnly>
+                  <Audit />
+                </AdminOnly>
+              }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

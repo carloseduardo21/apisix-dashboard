@@ -108,9 +108,19 @@ function StatusBadge({ c }: { c: AcmeCert }) {
         falhou
       </Badge>
     )
-  if (c.status === 'pending') return <Badge color="gray" variant="light">aguardando</Badge>
+  if (c.status === 'pending')
+    return (
+      <Badge color="gray" variant="light">
+        aguardando
+      </Badge>
+    )
   const days = c.not_after ? daysUntil(c.not_after) : 0
-  if (days < 0) return <Badge color="red" variant="light">vencido</Badge>
+  if (days < 0)
+    return (
+      <Badge color="red" variant="light">
+        vencido
+      </Badge>
+    )
   return (
     <Badge color={days < 30 ? 'orange' : 'teal'} variant="light" leftSection={<IconCheck size={12} />}>
       válido
@@ -125,7 +135,15 @@ function LogTimeline({ log }: { log: LogEntry[] }) {
         <Timeline.Item
           key={i}
           color={e.level === 'error' ? 'red' : e.level === 'warn' ? 'orange' : 'indigo'}
-          bullet={e.level === 'error' ? <IconX size={12} /> : e.level === 'warn' ? <IconAlertTriangle size={12} /> : <IconCheck size={12} />}
+          bullet={
+            e.level === 'error' ? (
+              <IconX size={12} />
+            ) : e.level === 'warn' ? (
+              <IconAlertTriangle size={12} />
+            ) : (
+              <IconCheck size={12} />
+            )
+          }
         >
           <Text size="sm">{e.message}</Text>
           <Text size="xs" c="dimmed">
@@ -150,9 +168,22 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: boolean; onIssue: () => void; onDelete: () => void; onLog: () => void }) {
+function CertCard({
+  c,
+  admin,
+  onIssue,
+  onDelete,
+  onLog,
+}: {
+  c: AcmeCert
+  admin: boolean
+  onIssue: () => void
+  onDelete: () => void
+  onLog: () => void
+}) {
   const days = c.not_after ? daysUntil(c.not_after) : null
-  const total = c.not_before && c.not_after ? (new Date(c.not_after).getTime() - new Date(c.not_before).getTime()) / 86_400_000 : 90
+  const total =
+    c.not_before && c.not_after ? (new Date(c.not_after).getTime() - new Date(c.not_before).getTime()) / 86_400_000 : 90
   const color = days === null ? 'gray' : days < 0 ? 'red' : days < 30 ? 'orange' : 'teal'
   const [first, ...rest] = c.domains
 
@@ -173,7 +204,11 @@ function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: 
                   {d}
                 </Badge>
               ))}
-              {rest.length > 4 && <Badge size="xs" variant="outline" color="gray">+{rest.length - 4}</Badge>}
+              {rest.length > 4 && (
+                <Badge size="xs" variant="outline" color="gray">
+                  +{rest.length - 4}
+                </Badge>
+              )}
               {c.environment === 'staging' && (
                 <Tooltip label="Emitido pelo ambiente de testes: navegadores não confiam neste certificado">
                   <Badge size="xs" color="orange" variant="filled">
@@ -198,7 +233,12 @@ function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: 
                   Ver registro da emissão
                 </Menu.Item>
                 <Menu.Divider />
-                <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={onDelete} disabled={c.status === 'issuing'}>
+                <Menu.Item
+                  color="red"
+                  leftSection={<IconTrash size={16} />}
+                  onClick={onDelete}
+                  disabled={c.status === 'issuing'}
+                >
                   Remover
                 </Menu.Item>
               </Menu.Dropdown>
@@ -228,7 +268,13 @@ function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: 
       )}
 
       {c.status === 'error' && c.last_error && (
-        <Alert color="red" variant="light" mt="md" icon={<IconAlertCircle size={16} />} title={`Falha na emissão${c.failures > 1 ? ` (${c.failures}ª tentativa)` : ''}`}>
+        <Alert
+          color="red"
+          variant="light"
+          mt="md"
+          icon={<IconAlertCircle size={16} />}
+          title={`Falha na emissão${c.failures > 1 ? ` (${c.failures}ª tentativa)` : ''}`}
+        >
           <Text size="sm" style={{ wordBreak: 'break-word' }}>
             {c.last_error}
           </Text>
@@ -266,7 +312,13 @@ function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: 
           <Button size="xs" variant="default" leftSection={<IconListDetails size={14} />} onClick={onLog}>
             Registro
           </Button>
-          <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} onClick={onIssue} loading={c.status === 'issuing'}>
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconRefresh size={14} />}
+            onClick={onIssue}
+            loading={c.status === 'issuing'}
+          >
             {c.status === 'valid' ? 'Renovar agora' : 'Emitir agora'}
           </Button>
         </Group>
@@ -276,7 +328,11 @@ function CertCard({ c, admin, onIssue, onDelete, onLog }: { c: AcmeCert; admin: 
 }
 
 function ProviderCard({ info }: { info: AcmeInfo }) {
-  const q = useQuery({ queryKey: ['acme', 'provider'], queryFn: () => api<Provider>('GET', '/api/acme/provider'), staleTime: 60_000 })
+  const q = useQuery({
+    queryKey: ['acme', 'provider'],
+    queryFn: () => api<Provider>('GET', '/api/acme/provider'),
+    staleTime: 60_000,
+  })
   return (
     <Card>
       <Group justify="space-between" align="flex-start">
@@ -287,7 +343,8 @@ function ProviderCard({ info }: { info: AcmeInfo }) {
           <div>
             <Text fw={700}>Let's Encrypt · DNS-01 via Cloudflare</Text>
             <Text size="sm" c="dimmed">
-              Renova {info.renew_before_days} dias antes do vencimento{info.email ? ` · conta ${info.email}` : ' · sem e-mail de contato'}
+              Renova {info.renew_before_days} dias antes do vencimento
+              {info.email ? ` · conta ${info.email}` : ' · sem e-mail de contato'}
             </Text>
           </div>
         </Group>
@@ -357,9 +414,15 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
   const [sslId, setSslId] = useState('')
   const [replace, setReplace] = useState(false)
   const [error, setError] = useState('')
-  const ssls = useQuery({ queryKey: ['apisix', 'ssls'], queryFn: () => api<AdminList>('GET', '/api/apisix/ssls'), enabled: opened })
+  const ssls = useQuery({
+    queryKey: ['apisix', 'ssls'],
+    queryFn: () => api<AdminList>('GET', '/api/apisix/ssls'),
+    enabled: opened,
+  })
 
-  const defaultId = domains[0] ? `acme-${domains[0].toLowerCase().replace('*', 'wildcard').replaceAll('.', '-')}`.slice(0, 64) : ''
+  const defaultId = domains[0]
+    ? `acme-${domains[0].toLowerCase().replace('*', 'wildcard').replaceAll('.', '-')}`.slice(0, 64)
+    : ''
   const effectiveId = sslId.trim() || defaultId
   const managedIds = new Set(existing.map((c) => c.ssl_id))
   const alreadyManaged = managedIds.has(effectiveId)
@@ -367,18 +430,33 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
   const overlapping = useMemo(() => {
     const wanted = new Set(domains.map((d) => d.toLowerCase()))
     return (ssls.data?.list ?? [])
-      .map((i) => ({ id: itemId('ssls', i), snis: ([] as unknown[]).concat(i.value.snis ?? i.value.sni ?? []).map(String) }))
+      .map((i) => ({
+        id: itemId('ssls', i),
+        snis: ([] as unknown[]).concat(i.value.snis ?? i.value.sni ?? []).map(String),
+      }))
       .filter((s) => s.id !== effectiveId && !managedIds.has(s.id) && s.snis.some((n) => wanted.has(n.toLowerCase())))
   }, [ssls.data, domains, effectiveId, managedIds])
 
   const create = useMutation({
-    mutationFn: () => api('POST', '/api/acme/certificates', { domains, environment: env, key_type: keyType, ssl_id: sslId.trim(), replace }),
+    mutationFn: () =>
+      api('POST', '/api/acme/certificates', {
+        domains,
+        environment: env,
+        key_type: keyType,
+        ssl_id: sslId.trim(),
+        replace,
+      }),
     onSuccess: () => {
-      notifications.show({ color: 'indigo', icon: <IconClockHour4 size={18} />, title: 'Emissão iniciada', message: 'Acompanhe o progresso no card do certificado.' })
+      notifications.show({
+        color: 'indigo',
+        icon: <IconClockHour4 size={18} />,
+        title: 'Emissão iniciada',
+        message: 'Acompanhe o progresso no card do certificado.',
+      })
       void qc.invalidateQueries({ queryKey: ['acme'] })
       close()
     },
-    onError: (e) => setError((e).message),
+    onError: (e) => setError(e.message),
   })
 
   const close = () => {
@@ -419,7 +497,7 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
           />
           <Text size="xs" c="dimmed" mt={4}>
             {env === 'staging'
-              ? 'Ambiente de testes do Let\'s Encrypt: valida todo o fluxo sem consumir os limites, mas o certificado não é confiável.'
+              ? "Ambiente de testes do Let's Encrypt: valida todo o fluxo sem consumir os limites, mas o certificado não é confiável."
               : 'Certificado confiável pelos navegadores. Use staging antes se estiver testando.'}
           </Text>
         </div>
@@ -434,28 +512,55 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
               { value: 'rsa2048', label: 'RSA 2048 (clientes antigos)' },
             ]}
           />
-          <TextInput label="ID do SSL no APISIX" placeholder={defaultId || 'gerado a partir do domínio'} value={sslId} onChange={(e) => setSslId(e.currentTarget.value)} />
+          <TextInput
+            label="ID do SSL no APISIX"
+            placeholder={defaultId || 'gerado a partir do domínio'}
+            value={sslId}
+            onChange={(e) => setSslId(e.currentTarget.value)}
+          />
         </Group>
 
         {alreadyManaged && (
-          <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} title={`O SSL ${effectiveId} já é emitido automaticamente`}>
-            <Text size="sm">Escolha outro ID, ou edite os domínios removendo e cadastrando o certificado existente.</Text>
+          <Alert
+            color="red"
+            variant="light"
+            icon={<IconAlertCircle size={16} />}
+            title={`O SSL ${effectiveId} já é emitido automaticamente`}
+          >
+            <Text size="sm">
+              Escolha outro ID, ou edite os domínios removendo e cadastrando o certificado existente.
+            </Text>
           </Alert>
         )}
         {sameId && (
-          <Alert color="orange" variant="light" icon={<IconAlertTriangle size={16} />} title={`Já existe o SSL ${effectiveId}`}>
+          <Alert
+            color="orange"
+            variant="light"
+            icon={<IconAlertTriangle size={16} />}
+            title={`Já existe o SSL ${effectiveId}`}
+          >
             <Text size="sm">
-              Ele continua servindo o tráfego até o novo certificado ser emitido e só então é substituído. Use isso para migrar um certificado gerenciado
-              manualmente.
+              Ele continua servindo o tráfego até o novo certificado ser emitido e só então é substituído. Use isso para
+              migrar um certificado gerenciado manualmente.
             </Text>
-            <Checkbox mt="sm" label="Substituir o SSL existente" checked={replace} onChange={(e) => setReplace(e.currentTarget.checked)} />
+            <Checkbox
+              mt="sm"
+              label="Substituir o SSL existente"
+              checked={replace}
+              onChange={(e) => setReplace(e.currentTarget.checked)}
+            />
           </Alert>
         )}
         {overlapping.length > 0 && (
-          <Alert color="yellow" variant="light" icon={<IconInfoCircle size={16} />} title="SNIs já atendidos por outro SSL">
+          <Alert
+            color="yellow"
+            variant="light"
+            icon={<IconInfoCircle size={16} />}
+            title="SNIs já atendidos por outro SSL"
+          >
             <Text size="sm">
-              {overlapping.map((o) => o.id).join(', ')} também responde por {domains.join(', ')}. Depois da emissão, exclua o SSL antigo para o APISIX usar
-              apenas o novo.
+              {overlapping.map((o) => o.id).join(', ')} também responde por {domains.join(', ')}. Depois da emissão,
+              exclua o SSL antigo para o APISIX usar apenas o novo.
             </Text>
           </Alert>
         )}
@@ -465,13 +570,18 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
           </Alert>
         )}
         <Text size="xs" c="dimmed">
-          Ao emitir, você aceita os termos de uso do Let's Encrypt. A chave privada é gerada aqui, enviada ao APISIX e nunca armazenada pela dashboard.
+          Ao emitir, você aceita os termos de uso do Let's Encrypt. A chave privada é gerada aqui, enviada ao APISIX e
+          nunca armazenada pela dashboard.
         </Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={close}>
             Cancelar
           </Button>
-          <Button onClick={() => create.mutate()} loading={create.isPending} disabled={domains.length === 0 || alreadyManaged || (sameId && !replace)}>
+          <Button
+            onClick={() => create.mutate()}
+            loading={create.isPending}
+            disabled={domains.length === 0 || alreadyManaged || (sameId && !replace)}
+          >
             Emitir certificado
           </Button>
         </Group>
@@ -503,17 +613,23 @@ export function Certificates() {
   const issue = useMutation({
     mutationFn: (id: number) => api('POST', `/api/acme/certificates/${id}/issue`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['acme'] }),
-    onError: (e) => notifications.show({ color: 'red', title: 'Não foi possível iniciar', message: (e).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Não foi possível iniciar', message: e.message }),
   })
   const remove = useMutation({
-    mutationFn: ({ id, ssl }: { id: number; ssl: boolean }) => api('DELETE', `/api/acme/certificates/${id}${ssl ? '?delete_ssl=true' : ''}`),
+    mutationFn: ({ id, ssl }: { id: number; ssl: boolean }) =>
+      api('DELETE', `/api/acme/certificates/${id}${ssl ? '?delete_ssl=true' : ''}`),
     onSuccess: () => {
-      notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Removido', message: 'O certificado não será mais renovado.' })
+      notifications.show({
+        color: 'teal',
+        icon: <IconCheck size={18} />,
+        title: 'Removido',
+        message: 'O certificado não será mais renovado.',
+      })
       void qc.invalidateQueries({ queryKey: ['acme'] })
       void qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
       setDeleting(null)
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao remover', message: (e).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao remover', message: e.message }),
   })
 
   // Refresh the SSL list once an issuance finishes.
@@ -551,7 +667,7 @@ export function Certificates() {
         <Skeleton h={160} />
       ) : q.error ? (
         <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar">
-          {(q.error).message}
+          {q.error.message}
         </Alert>
       ) : !q.data?.enabled ? (
         <SetupHelp />
@@ -595,7 +711,12 @@ export function Certificates() {
 
       <CreateModal opened={creating} onClose={() => setCreating(false)} existing={certs} />
 
-      <Modal opened={!!logCert} onClose={() => setLogOf(null)} title={<Text fw={700}>Registro da última emissão</Text>} size="lg">
+      <Modal
+        opened={!!logCert}
+        onClose={() => setLogOf(null)}
+        title={<Text fw={700}>Registro da última emissão</Text>}
+        size="lg"
+      >
         {logCert && (
           <Stack>
             <Text size="sm" c="dimmed">
@@ -606,7 +727,11 @@ export function Certificates() {
         )}
       </Modal>
 
-      <Modal opened={!!deleting} onClose={() => setDeleting(null)} title={<Text fw={700}>Remover certificado automático</Text>}>
+      <Modal
+        opened={!!deleting}
+        onClose={() => setDeleting(null)}
+        title={<Text fw={700}>Remover certificado automático</Text>}
+      >
         {deleting && (
           <Stack>
             <Text size="sm">
@@ -623,7 +748,12 @@ export function Certificates() {
               <Button variant="default" onClick={() => setDeleting(null)}>
                 Cancelar
               </Button>
-              <Button color="red" leftSection={<IconTrash size={16} />} loading={remove.isPending} onClick={() => remove.mutate({ id: deleting.id, ssl: deleteSSL })}>
+              <Button
+                color="red"
+                leftSection={<IconTrash size={16} />}
+                loading={remove.isPending}
+                onClick={() => remove.mutate({ id: deleting.id, ssl: deleteSSL })}
+              >
                 Remover
               </Button>
             </Group>

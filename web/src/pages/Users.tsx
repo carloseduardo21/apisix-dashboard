@@ -19,7 +19,18 @@ import {
 } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
-import { IconDots, IconKey, IconLockOpen, IconPlus, IconShieldCheck, IconShieldOff, IconTrash, IconUserCheck, IconUserOff, IconUserShield } from '@tabler/icons-react'
+import {
+  IconDots,
+  IconKey,
+  IconLockOpen,
+  IconPlus,
+  IconShieldCheck,
+  IconShieldOff,
+  IconTrash,
+  IconUserCheck,
+  IconUserOff,
+  IconUserShield,
+} from '@tabler/icons-react'
 import { PageHeader } from '../components/PageHeader'
 import { avatarColor, initials } from '../components/roles'
 import { api, type DashboardUser, type Role } from '../api'
@@ -36,7 +47,10 @@ const fmt = (s: string | null) => (s ? new Date(s).toLocaleString('pt-BR') : '�
 export function Users() {
   const { me } = useAuth()
   const qc = useQueryClient()
-  const { data: users = [], isPending } = useQuery({ queryKey: ['users'], queryFn: () => api<DashboardUser[]>('GET', '/api/users') })
+  const { data: users = [], isPending } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api<DashboardUser[]>('GET', '/api/users'),
+  })
   const [creating, setCreating] = useState(false)
   const [resetting, setResetting] = useState<DashboardUser | null>(null)
 
@@ -46,7 +60,7 @@ export function Users() {
       notifications.show({ color: 'green', message: 'Alteração aplicada' })
       void qc.invalidateQueries({ queryKey: ['users'] })
     },
-    onError: (e) => notifications.show({ color: 'red', message: (e).message }),
+    onError: (e) => notifications.show({ color: 'red', message: e.message }),
   })
 
   const confirm = (title: string, text: string, run: () => void, danger = false) =>
@@ -126,24 +140,51 @@ export function Users() {
                         allowDeselect={false}
                         onChange={(role) =>
                           role &&
-                          confirm('Alterar perfil', `Alterar o perfil de ${u.username} para ${role}? As sessões ativas do usuário serão encerradas.`, () =>
-                            action.mutate({ method: 'PATCH', path: `/api/users/${u.id}`, body: { role: role as Role } }),
+                          confirm(
+                            'Alterar perfil',
+                            `Alterar o perfil de ${u.username} para ${role}? As sessões ativas do usuário serão encerradas.`,
+                            () =>
+                              action.mutate({
+                                method: 'PATCH',
+                                path: `/api/users/${u.id}`,
+                                body: { role: role as Role },
+                              }),
                           )
                         }
                       />
                     </Table.Td>
                     <Table.Td>
                       <Group gap={4}>
-                        {u.disabled ? <Badge color="gray" variant="light">inativo</Badge> : <Badge color="teal" variant="dot">ativo</Badge>}
-                        {u.locked && <Badge color="red" variant="light">bloqueado</Badge>}
-                        {u.must_change_password && <Badge color="yellow" variant="light">trocar senha</Badge>}
+                        {u.disabled ? (
+                          <Badge color="gray" variant="light">
+                            inativo
+                          </Badge>
+                        ) : (
+                          <Badge color="teal" variant="dot">
+                            ativo
+                          </Badge>
+                        )}
+                        {u.locked && (
+                          <Badge color="red" variant="light">
+                            bloqueado
+                          </Badge>
+                        )}
+                        {u.must_change_password && (
+                          <Badge color="yellow" variant="light">
+                            trocar senha
+                          </Badge>
+                        )}
                       </Group>
                     </Table.Td>
                     <Table.Td>
                       {u.mfa_enrolled ? (
-                        <Badge color="teal" variant="light" leftSection={<IconShieldCheck size={12} />}>configurado</Badge>
+                        <Badge color="teal" variant="light" leftSection={<IconShieldCheck size={12} />}>
+                          configurado
+                        </Badge>
                       ) : (
-                        <Badge color="orange" variant="light">pendente</Badge>
+                        <Badge color="orange" variant="light">
+                          pendente
+                        </Badge>
                       )}
                     </Table.Td>
                     <Table.Td>
@@ -164,8 +205,10 @@ export function Users() {
                             <Menu.Item
                               leftSection={<IconShieldOff size={16} />}
                               onClick={() =>
-                                confirm('Redefinir MFA', `O usuário ${u.username} deverá configurar o MFA novamente no próximo login.`, () =>
-                                  action.mutate({ method: 'POST', path: `/api/users/${u.id}/reset-mfa` }),
+                                confirm(
+                                  'Redefinir MFA',
+                                  `O usuário ${u.username} deverá configurar o MFA novamente no próximo login.`,
+                                  () => action.mutate({ method: 'POST', path: `/api/users/${u.id}/reset-mfa` }),
                                 )
                               }
                             >
@@ -181,7 +224,13 @@ export function Users() {
                             )}
                             <Menu.Item
                               leftSection={u.disabled ? <IconUserCheck size={16} /> : <IconUserOff size={16} />}
-                              onClick={() => action.mutate({ method: 'PATCH', path: `/api/users/${u.id}`, body: { disabled: !u.disabled } })}
+                              onClick={() =>
+                                action.mutate({
+                                  method: 'PATCH',
+                                  path: `/api/users/${u.id}`,
+                                  body: { disabled: !u.disabled },
+                                })
+                              }
                             >
                               {u.disabled ? 'Reativar' : 'Desativar'}
                             </Menu.Item>
@@ -190,8 +239,11 @@ export function Users() {
                               color="red"
                               leftSection={<IconTrash size={16} />}
                               onClick={() =>
-                                confirm('Excluir usuário', `Excluir ${u.username}? Prefira desativar para manter o histórico claro.`, () =>
-                                  action.mutate({ method: 'DELETE', path: `/api/users/${u.id}` }), true,
+                                confirm(
+                                  'Excluir usuário',
+                                  `Excluir ${u.username}? Prefira desativar para manter o histórico claro.`,
+                                  () => action.mutate({ method: 'DELETE', path: `/api/users/${u.id}` }),
+                                  true,
                                 )
                               }
                             >
@@ -233,7 +285,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
   return (
     <Modal opened={opened} onClose={onClose} title="Novo usuário">
       <Stack>
-        {create.error && <Alert color="red">{(create.error).message}</Alert>}
+        {create.error && <Alert color="red">{create.error.message}</Alert>}
         <TextInput label="Usuário" value={username} onChange={(e) => setUsername(e.currentTarget.value)} required />
         <Select label="Perfil" data={ROLES} value={role} onChange={(v) => v && setRole(v)} allowDeselect={false} />
         <PasswordInput
@@ -271,7 +323,7 @@ function ResetPasswordModal({ user, onClose }: { user: DashboardUser | null; onC
   return (
     <Modal opened={!!user} onClose={onClose} title={`Senha temporária para ${user?.username ?? ''}`}>
       <Stack>
-        {reset.error && <Alert color="red">{(reset.error).message}</Alert>}
+        {reset.error && <Alert color="red">{reset.error.message}</Alert>}
         <PasswordInput
           label="Nova senha temporária"
           description="As sessões do usuário serão encerradas e ele deverá trocar a senha no próximo login."

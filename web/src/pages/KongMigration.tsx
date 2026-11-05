@@ -1,8 +1,30 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Anchor, Badge, Button, Card, Code, Skeleton, Stack, Table, Tabs, Text, TextInput, Tooltip } from '@mantine/core'
-import { IconAdjustments, IconAlertCircle, IconHistory, IconListCheck, IconRefresh, IconSearch, IconTransfer } from '@tabler/icons-react'
+import {
+  Alert,
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  Code,
+  Skeleton,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Tooltip,
+} from '@mantine/core'
+import {
+  IconAdjustments,
+  IconAlertCircle,
+  IconHistory,
+  IconListCheck,
+  IconRefresh,
+  IconSearch,
+  IconTransfer,
+} from '@tabler/icons-react'
 import { api } from '../api'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
@@ -32,13 +54,27 @@ DASH_KONG_ADMIN_TOKEN_FILE=/run/secrets/kong_admin_token   # se a Admin API exig
 
 function History() {
   const [query, setQuery] = useState('')
-  const q = useQuery({ queryKey: ['kong', 'history'], queryFn: () => api<MigrationRecord[]>('GET', '/api/migration/kong/history') })
+  const q = useQuery({
+    queryKey: ['kong', 'history'],
+    queryFn: () => api<MigrationRecord[]>('GET', '/api/migration/kong/history'),
+  })
   const rows = useMemo(() => {
     const s = query.trim().toLowerCase()
-    return (q.data ?? []).filter((r) => !s || r.kong_name.toLowerCase().includes(s) || r.id.toLowerCase().includes(s) || r.migrated_by.includes(s))
+    return (q.data ?? []).filter(
+      (r) => !s || r.kong_name.toLowerCase().includes(s) || r.id.toLowerCase().includes(s) || r.migrated_by.includes(s),
+    )
   }, [q.data, query])
   if (q.isPending) return <Skeleton h={200} />
-  if (!q.data?.length) return <Card><EmptyState icon={IconHistory} title="Nada migrado ainda" description="Cada objeto gravado no APISIX pela migração aparece aqui." /></Card>
+  if (!q.data?.length)
+    return (
+      <Card>
+        <EmptyState
+          icon={IconHistory}
+          title="Nada migrado ainda"
+          description="Cada objeto gravado no APISIX pela migração aparece aqui."
+        />
+      </Card>
+    )
   return (
     <Card>
       <TextInput
@@ -107,7 +143,14 @@ export function KongMigration() {
     [inventory.data],
   )
   const untranslated = useMemo(
-    () => [...new Set((inventory.data?.items ?? []).flatMap((i) => i.plugins?.filter((p) => p.status === 'error' && !p.custom).map((p) => p.kong) ?? []))].sort(),
+    () =>
+      [
+        ...new Set(
+          (inventory.data?.items ?? []).flatMap(
+            (i) => i.plugins?.filter((p) => p.status === 'error' && !p.custom).map((p) => p.kong) ?? [],
+          ),
+        ),
+      ].sort(),
     [inventory.data],
   )
 
@@ -129,7 +172,12 @@ export function KongMigration() {
         }
         actions={
           k?.enabled && (
-            <Button variant="default" leftSection={<IconRefresh size={16} />} loading={inventory.isFetching} onClick={() => qc.invalidateQueries({ queryKey: ['kong'] })}>
+            <Button
+              variant="default"
+              leftSection={<IconRefresh size={16} />}
+              loading={inventory.isFetching}
+              onClick={() => qc.invalidateQueries({ queryKey: ['kong'] })}
+            >
               Recarregar do Kong
             </Button>
           )
@@ -147,7 +195,12 @@ export function KongMigration() {
             </Alert>
           )}
           {untranslated.length > 0 && (
-            <Alert color="orange" variant="light" icon={<IconAlertCircle size={16} />} title="Plugins sem tradução automática">
+            <Alert
+              color="orange"
+              variant="light"
+              icon={<IconAlertCircle size={16} />}
+              title="Plugins sem tradução automática"
+            >
               <Text size="sm">
                 {untranslated.map((p, i) => (
                   <span key={p}>
@@ -182,14 +235,21 @@ export function KongMigration() {
                   <Skeleton h={300} />
                 </Stack>
               ) : inventory.error ? (
-                <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} title="Não foi possível montar o inventário">
-                  {(inventory.error).message}
+                <Alert
+                  color="red"
+                  variant="light"
+                  icon={<IconAlertCircle size={16} />}
+                  title="Não foi possível montar o inventário"
+                >
+                  {inventory.error.message}
                 </Alert>
               ) : (
                 <Inventory plan={inventory.data} onPreview={setPreview} />
               )}
             </Tabs.Panel>
-            <Tabs.Panel value="settings">{k.settings && <SettingsForm settings={k.settings} kongPlugins={kongPlugins} />}</Tabs.Panel>
+            <Tabs.Panel value="settings">
+              {k.settings && <SettingsForm settings={k.settings} kongPlugins={kongPlugins} />}
+            </Tabs.Panel>
             <Tabs.Panel value="history">
               <History />
             </Tabs.Panel>

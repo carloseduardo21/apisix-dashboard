@@ -58,7 +58,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
   const remove = useMutation({
     mutationFn: (id: string) => api('DELETE', `${base}/${encodeURIComponent(id)}`),
     onSuccess: () => done('Excluída', 'Credencial excluída'),
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: e.message }),
   })
 
   const confirmDelete = (id: string) =>
@@ -66,7 +66,8 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
       title: <Text fw={600}>Excluir credencial</Text>,
       children: (
         <Text size="sm">
-          Excluir <Code>{id}</Code> de <Code>{username}</Code>? Clientes que usam essa credencial deixam de se autenticar imediatamente.
+          Excluir <Code>{id}</Code> de <Code>{username}</Code>? Clientes que usam essa credencial deixam de se
+          autenticar imediatamente.
         </Text>
       ),
       labels: { confirm: 'Excluir', cancel: 'Cancelar' },
@@ -77,7 +78,8 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
   if (unsupported(error)) {
     return (
       <Alert color="gray" icon={<IconAlertCircle size={16} />}>
-        Este APISIX não suporta credenciais (disponível a partir da versão 3.10). Configure a autenticação nos plugins do consumer.
+        Este APISIX não suporta credenciais (disponível a partir da versão 3.10). Configure a autenticação nos plugins
+        do consumer.
       </Alert>
     )
   }
@@ -90,7 +92,8 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
         <div>
           <Text fw={600}>Credenciais</Text>
           <Text size="xs" c="dimmed">
-            Um consumer pode ter várias credenciais, por exemplo uma por aplicação, para trocar uma sem derrubar as outras.
+            Um consumer pode ter várias credenciais, por exemplo uma por aplicação, para trocar uma sem derrubar as
+            outras.
           </Text>
         </div>
         {writable && (
@@ -102,7 +105,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
 
       {error && (
         <Alert color="red" icon={<IconAlertCircle size={16} />}>
-          {(error).message}
+          {error.message}
         </Alert>
       )}
 
@@ -146,7 +149,9 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
                             </Badge>
                           ))
                         ) : (
-                          <Text size="sm" c="dimmed">—</Text>
+                          <Text size="sm" c="dimmed">
+                            —
+                          </Text>
                         )}
                       </Group>
                     </Table.Td>
@@ -164,12 +169,22 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
                       <Table.Td>
                         <Group gap={2} wrap="nowrap">
                           <Tooltip label="Editar">
-                            <ActionIcon variant="subtle" color="gray" aria-label={`Editar ${id}`} onClick={() => setEditing({ mode: 'edit', id, value: editable(item.value) })}>
+                            <ActionIcon
+                              variant="subtle"
+                              color="gray"
+                              aria-label={`Editar ${id}`}
+                              onClick={() => setEditing({ mode: 'edit', id, value: editable(item.value) })}
+                            >
                               <IconEdit size={16} />
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Excluir">
-                            <ActionIcon variant="subtle" color="red" aria-label={`Excluir ${id}`} onClick={() => confirmDelete(id)}>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              aria-label={`Excluir ${id}`}
+                              onClick={() => confirmDelete(id)}
+                            >
                               <IconTrash size={16} />
                             </ActionIcon>
                           </Tooltip>

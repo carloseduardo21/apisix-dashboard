@@ -17,7 +17,14 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core'
-import { IconAlertTriangle, IconArrowUpRight, IconCertificate, IconCircleCheck, IconHistory, IconPlugConnectedX } from '@tabler/icons-react'
+import {
+  IconAlertTriangle,
+  IconArrowUpRight,
+  IconCertificate,
+  IconCircleCheck,
+  IconHistory,
+  IconPlugConnectedX,
+} from '@tabler/icons-react'
 import { api, isAdmin, isStreamDisabled, itemId, type AdminList, type AuditEvent } from '../api'
 import { useAuth } from '../auth'
 import { useGatewayStatus } from '../components/Layout'
@@ -56,7 +63,9 @@ function detail(key: string, values: Obj[]): string {
       return `${auth} com autenticação`
     }
     case 'ssls': {
-      const soon = values.filter((v) => typeof v.validity_end === 'number' && v.validity_end * 1000 - Date.now() < 30 * 86_400_000).length
+      const soon = values.filter(
+        (v) => typeof v.validity_end === 'number' && v.validity_end * 1000 - Date.now() < 30 * 86_400_000,
+      ).length
       return soon ? `${soon} vencem em até 30 dias` : 'nenhum vencendo'
     }
     case 'global_rules':
@@ -88,7 +97,9 @@ function GatewayCard() {
                 {ok ? 'Gateway operacional' : 'Admin API indisponível'}
               </Text>
               <Text size="sm" c="dimmed">
-                {ok ? `${data?.server || 'APISIX'} · Admin API respondendo em ${data?.latency_ms} ms` : (data as { error?: string })?.error ?? (error as Error)?.message}
+                {ok
+                  ? `${data?.server || 'APISIX'} · Admin API respondendo em ${data?.latency_ms} ms`
+                  : ((data as { error?: string })?.error ?? (error as Error)?.message)}
               </Text>
             </div>
           </Group>
@@ -118,7 +129,11 @@ export function Overview() {
   const ssl = lists[MAIN_RESOURCES.indexOf('ssls')]
   const certs = (ssl.data?.list ?? [])
     .filter((i) => typeof i.value.validity_end === 'number')
-    .map((i) => ({ id: itemId('ssls', i), snis: ([] as unknown[]).concat(i.value.snis ?? i.value.sni ?? []).join(', '), days: daysLeft(i.value.validity_end as number) }))
+    .map((i) => ({
+      id: itemId('ssls', i),
+      snis: ([] as unknown[]).concat(i.value.snis ?? i.value.sni ?? []).join(', '),
+      days: daysLeft(i.value.validity_end as number),
+    }))
     .sort((a, b) => a.days - b.days)
 
   const hour = new Date().getHours()
@@ -148,15 +163,25 @@ export function Overview() {
                 {q.isPending ? (
                   <Skeleton h={34} w={60} mt="sm" />
                 ) : disabled ? (
-                  <Text className={classes.statValue} c="dimmed">—</Text>
+                  <Text className={classes.statValue} c="dimmed">
+                    —
+                  </Text>
                 ) : q.error ? (
-                  <Text className={classes.statValue} c="red">!</Text>
+                  <Text className={classes.statValue} c="red">
+                    !
+                  </Text>
                 ) : (
                   <Text className={classes.statValue}>{q.data?.total ?? values.length}</Text>
                 )}
                 <Group justify="space-between" mt={4}>
                   <Text size="xs" c="dimmed">
-                    {disabled ? 'modo stream desativado' : q.error ? 'erro ao carregar' : q.data ? detail(key, values) : ' '}
+                    {disabled
+                      ? 'modo stream desativado'
+                      : q.error
+                        ? 'erro ao carregar'
+                        : q.data
+                          ? detail(key, values)
+                          : ' '}
                   </Text>
                   <IconArrowUpRight size={14} className={classes.statArrow} />
                 </Group>
@@ -196,7 +221,11 @@ export function Overview() {
                         <Text size="sm" fw={600}>
                           {e.actor}
                         </Text>
-                        <Badge size="xs" variant="light" color={e.outcome === 'failure' ? 'red' : actionColor(e.action)}>
+                        <Badge
+                          size="xs"
+                          variant="light"
+                          color={e.outcome === 'failure' ? 'red' : actionColor(e.action)}
+                        >
                           {actionLabel(e.action)}
                         </Badge>
                       </Group>
@@ -245,7 +274,12 @@ export function Overview() {
                           </Text>
                         </Group>
                       </Group>
-                      <Progress value={Math.max(2, Math.min(100, (c.days / 365) * 100))} color={color} size="sm" radius="xl" />
+                      <Progress
+                        value={Math.max(2, Math.min(100, (c.days / 365) * 100))}
+                        color={color}
+                        size="sm"
+                        radius="xl"
+                      />
                     </div>
                   )
                 })}

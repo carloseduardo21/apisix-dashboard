@@ -24,7 +24,15 @@ export function textProps(value: Obj, onChange: (v: Obj) => void, key: string) {
   }
 }
 
-export function NameDesc({ value, onChange, nameLabel = 'Nome' }: { value: Obj; onChange: (v: Obj) => void; nameLabel?: string }) {
+export function NameDesc({
+  value,
+  onChange,
+  nameLabel = 'Nome',
+}: {
+  value: Obj
+  onChange: (v: Obj) => void
+  nameLabel?: string
+}) {
   return (
     <>
       <TextInput label={nameLabel} {...textProps(value, onChange, 'name')} />
@@ -53,7 +61,11 @@ export function OneOrMany({
   placeholder?: string
   required?: boolean
 }) {
-  const list = Array.isArray(value[many]) ? (value[many] as string[]) : typeof value[single] === 'string' ? [value[single]] : []
+  const list = Array.isArray(value[many])
+    ? (value[many] as string[])
+    : typeof value[single] === 'string'
+      ? [value[single]]
+      : []
   return (
     <TagsInput
       label={rest.label}
@@ -103,7 +115,10 @@ export function ResourceSelect({
   const { data = [], isPending } = useResourceOptions(resource)
   const current = value === undefined || value === null ? null : String(value)
   // Keep a dangling reference visible instead of silently clearing it.
-  const options = current && !data.some((o) => o.value === current) ? [...data, { value: current, label: `${current} (não encontrado)` }] : data
+  const options =
+    current && !data.some((o) => o.value === current)
+      ? [...data, { value: current, label: `${current} (não encontrado)` }]
+      : data
   return (
     <Select
       label={label}
@@ -163,7 +178,17 @@ export function AdvancedFields({
 }
 
 /** Accordion section wrapper used by every resource form. */
-export function Section({ value, title, hint, children }: { value: string; title: string; hint?: ReactNode; children: ReactNode }) {
+export function Section({
+  value,
+  title,
+  hint,
+  children,
+}: {
+  value: string
+  title: string
+  hint?: ReactNode
+  children: ReactNode
+}) {
   return (
     <Accordion.Item value={value}>
       <Accordion.Control>

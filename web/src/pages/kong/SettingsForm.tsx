@@ -166,10 +166,15 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
     mutationFn: () => api<Settings>('PUT', '/api/migration/kong/settings', draft),
     onSuccess: () => {
       setError('')
-      notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Padrões salvos', message: 'O inventário foi recalculado com os novos padrões.' })
+      notifications.show({
+        color: 'teal',
+        icon: <IconCheck size={18} />,
+        title: 'Padrões salvos',
+        message: 'O inventário foi recalculado com os novos padrões.',
+      })
       void qc.invalidateQueries({ queryKey: ['kong'] })
     },
-    onError: (e) => setError((e).message),
+    onError: (e) => setError(e.message),
   })
 
   const exampleId = `${draft.id_prefix}${draft.id_strategy === 'name' ? 'pagamentos-api' : '5d34560d-8c3c-…'}`
@@ -273,7 +278,8 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
             Reescrita de hosts
           </Title>
           <Text size="xs" c="dimmed" mb="md">
-            Troca o host de services e targets, por exemplo pelo nome do serviço no Swarm. O header Host enviado continua o original.
+            Troca o host de services e targets, por exemplo pelo nome do serviço no Swarm. O header Host enviado
+            continua o original.
           </Text>
           <Stack gap={6}>
             {draft.host_rewrites.map((h, i) => (
@@ -282,16 +288,36 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
                   placeholder="pagamentos.interno"
                   value={h.from}
                   style={{ flex: 1 }}
-                  onChange={(e) => set('host_rewrites', draft.host_rewrites.map((r, j) => (j === i ? { ...r, from: e.currentTarget.value.trim() } : r)))}
+                  onChange={(e) =>
+                    set(
+                      'host_rewrites',
+                      draft.host_rewrites.map((r, j) => (j === i ? { ...r, from: e.currentTarget.value.trim() } : r)),
+                    )
+                  }
                 />
                 <IconArrowRight size={16} style={{ flexShrink: 0 }} />
                 <TextInput
                   placeholder="pagamentos_api:8080"
                   value={h.to}
                   style={{ flex: 1 }}
-                  onChange={(e) => set('host_rewrites', draft.host_rewrites.map((r, j) => (j === i ? { ...r, to: e.currentTarget.value.trim() } : r)))}
+                  onChange={(e) =>
+                    set(
+                      'host_rewrites',
+                      draft.host_rewrites.map((r, j) => (j === i ? { ...r, to: e.currentTarget.value.trim() } : r)),
+                    )
+                  }
                 />
-                <ActionIcon variant="subtle" color="red" onClick={() => set('host_rewrites', draft.host_rewrites.filter((_, j) => j !== i))} aria-label="Remover">
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  onClick={() =>
+                    set(
+                      'host_rewrites',
+                      draft.host_rewrites.filter((_, j) => j !== i),
+                    )
+                  }
+                  aria-label="Remover"
+                >
                   <IconTrash size={16} />
                 </ActionIcon>
               </Group>
@@ -329,23 +355,30 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           <div>
             <Title order={4}>Regras de plugins</Title>
             <Text size="sm" c="dimmed" maw={760}>
-              Para plugins custom (ou para trocar a tradução padrão). A regra vale para todas as ocorrências do plugin: services, rotas, consumers e globais.
+              Para plugins custom (ou para trocar a tradução padrão). A regra vale para todas as ocorrências do plugin:
+              services, rotas, consumers e globais.
             </Text>
           </div>
           <Button
             variant="light"
             leftSection={<IconPlus size={16} />}
-            onClick={() => set('plugin_rules', [...draft.plugin_rules, { kong_plugin: '', action: 'map', apisix_plugin: '', template: undefined }])}
+            onClick={() =>
+              set('plugin_rules', [
+                ...draft.plugin_rules,
+                { kong_plugin: '', action: 'map', apisix_plugin: '', template: undefined },
+              ])
+            }
           >
             Nova regra
           </Button>
         </Group>
         <Alert variant="light" color="indigo" mb="md" title="Como escrever o template">
           <Text size="sm">
-            <Code>{'${config.campo}'}</Code> copia o valor do plugin no Kong mantendo o tipo; <Code>{'${config.campo|padrão}'}</Code> usa o padrão quando ausente;{' '}
-            <Code>{'${config}'}</Code> copia a configuração inteira. Também existem <Code>plugin</Code>, <Code>service</Code>, <Code>route</Code>,{' '}
-            <Code>consumer</Code> (objetos do Kong) e <Code>apisix.route_id</Code>, <Code>apisix.service_id</Code>, <Code>apisix.upstream_id</Code>,{' '}
-            <Code>apisix.consumer</Code>.
+            <Code>{'${config.campo}'}</Code> copia o valor do plugin no Kong mantendo o tipo;{' '}
+            <Code>{'${config.campo|padrão}'}</Code> usa o padrão quando ausente; <Code>{'${config}'}</Code> copia a
+            configuração inteira. Também existem <Code>plugin</Code>, <Code>service</Code>, <Code>route</Code>,{' '}
+            <Code>consumer</Code> (objetos do Kong) e <Code>apisix.route_id</Code>, <Code>apisix.service_id</Code>,{' '}
+            <Code>apisix.upstream_id</Code>, <Code>apisix.consumer</Code>.
           </Text>
         </Alert>
         <Stack>
@@ -360,24 +393,49 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
               rule={r}
               kongPlugins={kongPlugins}
               apisixPlugins={apisixPlugins}
-              onChange={(nr) => set('plugin_rules', draft.plugin_rules.map((x, j) => (j === i ? nr : x)))}
-              onRemove={() => set('plugin_rules', draft.plugin_rules.filter((_, j) => j !== i))}
+              onChange={(nr) =>
+                set(
+                  'plugin_rules',
+                  draft.plugin_rules.map((x, j) => (j === i ? nr : x)),
+                )
+              }
+              onRemove={() =>
+                set(
+                  'plugin_rules',
+                  draft.plugin_rules.filter((_, j) => j !== i),
+                )
+              }
             />
           ))}
         </Stack>
       </Card>
 
       {error && (
-        <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} title="Não foi possível salvar" style={{ whiteSpace: 'pre-line' }}>
+        <Alert
+          color="red"
+          variant="light"
+          icon={<IconAlertCircle size={16} />}
+          title="Não foi possível salvar"
+          style={{ whiteSpace: 'pre-line' }}
+        >
           {error}
         </Alert>
       )}
       <Group justify="flex-end">
-        {dirty && <Badge color="orange" variant="light">alterações não salvas</Badge>}
+        {dirty && (
+          <Badge color="orange" variant="light">
+            alterações não salvas
+          </Badge>
+        )}
         <Button variant="default" disabled={!dirty} onClick={() => setDraft(settings)}>
           Descartar
         </Button>
-        <Button leftSection={<IconDeviceFloppy size={16} />} disabled={!dirty} loading={save.isPending} onClick={() => save.mutate()}>
+        <Button
+          leftSection={<IconDeviceFloppy size={16} />}
+          disabled={!dirty}
+          loading={save.isPending}
+          onClick={() => save.mutate()}
+        >
           Salvar padrões
         </Button>
       </Group>

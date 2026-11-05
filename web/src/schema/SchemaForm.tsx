@@ -96,7 +96,11 @@ function VariantField(props: FieldProps & { variants: JSONSchema[] }) {
   const { variants, value, onChange, name, schema } = props
   const [selected, setSelected] = useState(() => matchVariant(variants, value))
   const base: JSONSchema = { ...schema, oneOf: undefined, anyOf: undefined }
-  const current = normalize({ ...base, ...variants[selected], properties: { ...base.properties, ...variants[selected].properties } })
+  const current = normalize({
+    ...base,
+    ...variants[selected],
+    properties: { ...base.properties, ...variants[selected].properties },
+  })
   return (
     <Stack gap={4}>
       <Group gap={6} wrap="nowrap">
@@ -148,7 +152,9 @@ function StringField({ schema, value, onChange, name, required, path, sensitive 
     return (
       <PasswordInput
         {...common}
-        description={str === MASKED ? 'Valor atual mascarado. Mantenha para preservar ou digite um novo.' : common.description}
+        description={
+          str === MASKED ? 'Valor atual mascarado. Mantenha para preservar ou digite um novo.' : common.description
+        }
         onChange={(e) => onChange(e.currentTarget.value)}
       />
     )
@@ -239,7 +245,12 @@ function ArrayField(props: FieldProps) {
                 <Text size="xs" c="dimmed">
                   #{i + 1}
                 </Text>
-                <ActionIcon size="sm" variant="subtle" color="red" onClick={() => onChange(list.filter((_, j) => j !== i))}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color="red"
+                  onClick={() => onChange(list.filter((_, j) => j !== i))}
+                >
                   <IconTrash size={14} />
                 </ActionIcon>
               </Group>
@@ -252,7 +263,13 @@ function ArrayField(props: FieldProps) {
               />
             </Paper>
           ))}
-          <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => onChange([...list, {}])} w="fit-content">
+          <Button
+            size="xs"
+            variant="light"
+            leftSection={<IconPlus size={14} />}
+            onClick={() => onChange([...list, {}])}
+            w="fit-content"
+          >
             Adicionar
           </Button>
         </Stack>
@@ -264,8 +281,11 @@ function ArrayField(props: FieldProps) {
 
 function ObjectField(props: FieldProps) {
   const { schema, name, required, path } = props
-  const mapSchema =
-    schema.patternProperties ? Object.values(schema.patternProperties)[0] : isObj(schema.additionalProperties) ? schema.additionalProperties : undefined
+  const mapSchema = schema.patternProperties
+    ? Object.values(schema.patternProperties)[0]
+    : isObj(schema.additionalProperties)
+      ? schema.additionalProperties
+      : undefined
 
   if (!schema.properties && mapSchema) {
     const valueType = normalize(mapSchema).type
@@ -275,14 +295,27 @@ function ObjectField(props: FieldProps) {
   }
   if (!schema.properties) return <JsonField {...props} />
 
-  const body = <ObjectFields schema={schema} value={props.value} onChange={props.onChange} path={path} sensitive={props.sensitive} />
+  const body = (
+    <ObjectFields
+      schema={schema}
+      value={props.value}
+      onChange={props.onChange}
+      path={path}
+      sensitive={props.sensitive}
+    />
+  )
   if (!name) return body
   return (
     <Fieldset
       legend={
         <Text size="sm" fw={500}>
           {name}
-          {required && <Text span c="red"> *</Text>}
+          {required && (
+            <Text span c="red">
+              {' '}
+              *
+            </Text>
+          )}
         </Text>
       }
       variant="filled"
@@ -328,7 +361,15 @@ interface ObjectFieldsProps {
  * ones already set come first; the others sit in a collapsible section so
  * large plugins stay readable.
  */
-export function ObjectFields({ schema: raw, value, onChange, path, sensitive, exclude = [], moreLabel = 'Mais opções' }: ObjectFieldsProps) {
+export function ObjectFields({
+  schema: raw,
+  value,
+  onChange,
+  path,
+  sensitive,
+  exclude = [],
+  moreLabel = 'Mais opções',
+}: ObjectFieldsProps) {
   const schema = normalize(raw)
   const obj = isObj(value) ? value : {}
   const required = new Set(schema.required ?? [])
@@ -377,7 +418,16 @@ export function ObjectFields({ schema: raw, value, onChange, path, sensitive, ex
   )
 }
 
-function KeyValueField({ schema, value, onChange, name, required, path, sensitive, numeric }: FieldProps & { numeric: boolean }) {
+function KeyValueField({
+  schema,
+  value,
+  onChange,
+  name,
+  required,
+  path,
+  sensitive,
+  numeric,
+}: FieldProps & { numeric: boolean }) {
   return (
     <KeyValueEditor
       label={name}
@@ -414,7 +464,9 @@ export function KeyValueEditor({
   valuePlaceholder?: string
 }) {
   // Rows are kept locally so an entry with an empty key can exist while typing.
-  const [rows, setRows] = useState<[string, string][]>(() => Object.entries(value ?? {}).map(([k, v]) => [k, String(v)]))
+  const [rows, setRows] = useState<[string, string][]>(() =>
+    Object.entries(value ?? {}).map(([k, v]) => [k, String(v)]),
+  )
   const emit = (next: [string, string][]) => {
     setRows(next)
     const out: Record<string, string | number> = {}
@@ -444,7 +496,13 @@ export function KeyValueEditor({
             </ActionIcon>
           </Group>
         ))}
-        <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={() => setRows([...rows, ['', '']])} w="fit-content">
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconPlus size={14} />}
+          onClick={() => setRows([...rows, ['', '']])}
+          w="fit-content"
+        >
           Adicionar
         </Button>
       </Stack>

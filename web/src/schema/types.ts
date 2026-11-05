@@ -58,7 +58,9 @@ export type Obj = Record<string, unknown>
 export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
 
 function isEmpty(v: unknown) {
-  return v === undefined || v === '' || (Array.isArray(v) && v.length === 0) || (isObj(v) && Object.keys(v).length === 0)
+  return (
+    v === undefined || v === '' || (Array.isArray(v) && v.length === 0) || (isObj(v) && Object.keys(v).length === 0)
+  )
 }
 
 /** Returns a copy of obj with key set, or removed when v is empty. */
@@ -93,7 +95,16 @@ export function normalize(s: JSONSchema): JSONSchema {
 
 /** A oneOf/anyOf branch that only adds constraints (e.g. {required: [...]}) and renders nothing. */
 export function isConstraintOnly(s: JSONSchema) {
-  return !s.type && !s.properties && !s.items && !s.enum && s.const === undefined && !s.oneOf && !s.anyOf && !s.patternProperties
+  return (
+    !s.type &&
+    !s.properties &&
+    !s.items &&
+    !s.enum &&
+    s.const === undefined &&
+    !s.oneOf &&
+    !s.anyOf &&
+    !s.patternProperties
+  )
 }
 
 export function valueType(v: unknown): string | undefined {
@@ -141,7 +152,7 @@ export function variantLabel(raw: JSONSchema, i: number): string {
     object: 'objeto',
     array: 'lista',
   }
-  return v.type ? names[v.type] ?? v.type : `Opção ${i + 1}`
+  return v.type ? (names[v.type] ?? v.type) : `Opção ${i + 1}`
 }
 
 // Field names that hold secrets in any plugin (mirrors the backend rules).

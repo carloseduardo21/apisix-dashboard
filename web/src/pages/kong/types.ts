@@ -85,7 +85,14 @@ export interface Job {
   done: number
   error?: string
   log: { ts: string; level: Note['level']; message: string }[]
-  results: { kind: Kind; kong_name: string; path: string; action: Action; outcome: 'success' | 'failure' | 'rolled_back' | 'skipped'; error?: string }[]
+  results: {
+    kind: Kind
+    kong_name: string
+    path: string
+    action: Action
+    outcome: 'success' | 'failure' | 'rolled_back' | 'skipped'
+    error?: string
+  }[]
 }
 
 export interface MigrationRecord {
@@ -110,7 +117,11 @@ export const KIND_LABEL: Record<Kind, string> = {
 export const ACTION: Record<Action, { label: string; color: string; hint: string }> = {
   create: { label: 'criar', color: 'indigo', hint: 'Ainda não existe no APISIX' },
   update: { label: 'atualizar', color: 'yellow', hint: 'Migrado antes; o Kong ou os padrões mudaram' },
-  overwrite: { label: 'sobrescrever', color: 'orange', hint: 'Já existe no APISIX sem ter vindo da migração; será substituído' },
+  overwrite: {
+    label: 'sobrescrever',
+    color: 'orange',
+    hint: 'Já existe no APISIX sem ter vindo da migração; será substituído',
+  },
   unchanged: { label: 'migrado', color: 'teal', hint: 'Já está no APISIX como no Kong' },
   conflict: { label: 'conflito', color: 'orange', hint: 'Já existe no APISIX sem ter vindo da migração; será pulado' },
   blocked: { label: 'bloqueado', color: 'red', hint: 'Não pode ser migrado; veja os avisos' },
@@ -126,4 +137,8 @@ export function groupAction(items: PlanItem[]): Action {
 }
 
 export const worstNote = (items: PlanItem[]) =>
-  items.some((i) => i.notes.some((n) => n.level === 'error')) ? 'error' : items.some((i) => i.notes.some((n) => n.level === 'warn')) ? 'warn' : undefined
+  items.some((i) => i.notes.some((n) => n.level === 'error'))
+    ? 'error'
+    : items.some((i) => i.notes.some((n) => n.level === 'warn'))
+      ? 'warn'
+      : undefined

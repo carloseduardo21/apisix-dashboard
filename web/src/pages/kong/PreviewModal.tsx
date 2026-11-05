@@ -20,7 +20,16 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconAlertCircle, IconAlertTriangle, IconArrowRight, IconCheck, IconInfoCircle, IconPlayerPlay, IconRotate, IconX } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconAlertTriangle,
+  IconArrowRight,
+  IconCheck,
+  IconInfoCircle,
+  IconPlayerPlay,
+  IconRotate,
+  IconX,
+} from '@tabler/icons-react'
 import { api } from '../../api'
 import { ACTION, KIND_LABEL, writes, type Job, type Note, type Plan, type PlanItem, type Selection } from './types'
 
@@ -35,7 +44,11 @@ export function NoteList({ notes }: { notes: Note[] }) {
         const I = NOTE_ICON[n.level]
         return (
           <Group key={i} gap={6} wrap="nowrap" align="flex-start">
-            <I size={15} color={`var(--mantine-color-${NOTE_COLOR[n.level]}-6)`} style={{ flexShrink: 0, marginTop: 2 }} />
+            <I
+              size={15}
+              color={`var(--mantine-color-${NOTE_COLOR[n.level]}-6)`}
+              style={{ flexShrink: 0, marginTop: 2 }}
+            />
             <Text size="sm">{n.message}</Text>
           </Group>
         )
@@ -73,7 +86,12 @@ export function PluginBadges({ item }: { item: PlanItem }) {
                   : 'sem tradução'
           }
         >
-          <Badge size="xs" variant={p.status === 'ignored' || p.status === 'disabled' ? 'outline' : 'light'} color={color[p.status]} td={p.status === 'disabled' ? 'line-through' : undefined}>
+          <Badge
+            size="xs"
+            variant={p.status === 'ignored' || p.status === 'disabled' ? 'outline' : 'light'}
+            color={color[p.status]}
+            td={p.status === 'disabled' ? 'line-through' : undefined}
+          >
             {p.kong}
             {p.custom ? ' ★' : ''}
           </Badge>
@@ -156,7 +174,11 @@ function JobView({ job }: { job: Job }) {
       <Progress value={pct} color={job.status === 'failed' ? 'red' : 'teal'} animated={job.status === 'running'} />
       <Timeline bulletSize={20} lineWidth={2} active={job.log.length - 1}>
         {job.log.map((e, i) => (
-          <Timeline.Item key={i} color={NOTE_COLOR[e.level]} bullet={e.level === 'error' ? <IconX size={11} /> : <IconCheck size={11} />}>
+          <Timeline.Item
+            key={i}
+            color={NOTE_COLOR[e.level]}
+            bullet={e.level === 'error' ? <IconX size={11} /> : <IconCheck size={11} />}
+          >
             <Text size="sm">{e.message}</Text>
             <Text size="xs" c="dimmed">
               {new Date(e.ts).toLocaleTimeString('pt-BR')}
@@ -209,7 +231,15 @@ function JobView({ job }: { job: Job }) {
 }
 
 /** Shows what a selection will write to APISIX and applies it. */
-export function PreviewModal({ selection, opened, onClose }: { selection: Selection | null; opened: boolean; onClose: () => void }) {
+export function PreviewModal({
+  selection,
+  opened,
+  onClose,
+}: {
+  selection: Selection | null
+  opened: boolean
+  onClose: () => void
+}) {
   const qc = useQueryClient()
   const mobile = useMediaQuery('(max-width: 48em)')
   const [confirmed, setConfirmed] = useState(false)
@@ -245,18 +275,31 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
   const apply = useMutation({
     mutationFn: () => api<Job>('POST', '/api/migration/kong/apply', { ...selection, hash: plan.data!.hash }),
     onSuccess: (j) => setJobId(j.id),
-    onError: (e) => setError((e).message),
+    onError: (e) => setError(e.message),
   })
 
   const items = plan.data?.items ?? []
   const toWrite = items.filter((i) => writes(i.action))
-  const counts = items.reduce<Record<string, number>>((acc, i) => ({ ...acc, [i.action]: (acc[i.action] ?? 0) + 1 }), {})
+  const counts = items.reduce<Record<string, number>>(
+    (acc, i) => ({ ...acc, [i.action]: (acc[i.action] ?? 0) + 1 }),
+    {},
+  )
   const skipped = items.filter((i) => i.action === 'blocked' || i.action === 'conflict').length
 
   return (
-    <Modal opened={opened} onClose={onClose} size="90%" fullScreen={mobile} title={<Text fw={700}>{jobId ? 'Aplicando a migração' : 'Pré-visualização da migração'}</Text>}>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      size="90%"
+      fullScreen={mobile}
+      title={<Text fw={700}>{jobId ? 'Aplicando a migração' : 'Pré-visualização da migração'}</Text>}
+    >
       {jobId ? (
-        current ? <JobView job={current} /> : <Loader />
+        current ? (
+          <JobView job={current} />
+        ) : (
+          <Loader />
+        )
       ) : plan.isPending ? (
         <Group py="xl" justify="center">
           <Loader />
@@ -264,7 +307,7 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
         </Group>
       ) : plan.error ? (
         <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
-          {(plan.error).message}
+          {plan.error.message}
         </Alert>
       ) : (
         <Stack>
@@ -278,12 +321,14 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
               ))}
           </Group>
           <Text size="sm" c="dimmed">
-            Ordem de gravação: upstreams <IconArrowRight size={12} /> services <IconArrowRight size={12} /> consumers <IconArrowRight size={12} /> credenciais{' '}
-            <IconArrowRight size={12} /> rotas <IconArrowRight size={12} /> plugins globais. Se algo falhar, o que este lote gravou é desfeito.
+            Ordem de gravação: upstreams <IconArrowRight size={12} /> services <IconArrowRight size={12} /> consumers{' '}
+            <IconArrowRight size={12} /> credenciais <IconArrowRight size={12} /> rotas <IconArrowRight size={12} />{' '}
+            plugins globais. Se algo falhar, o que este lote gravou é desfeito.
           </Text>
           {skipped > 0 && (
             <Alert color="orange" variant="light" icon={<IconAlertTriangle size={16} />}>
-              {skipped} {skipped === 1 ? 'item não será aplicado' : 'itens não serão aplicados'} (bloqueados ou em conflito). Os demais seguem normalmente.
+              {skipped} {skipped === 1 ? 'item não será aplicado' : 'itens não serão aplicados'} (bloqueados ou em
+              conflito). Os demais seguem normalmente.
             </Alert>
           )}
           <ScrollArea.Autosize mah="58vh" offsetScrollbars>
@@ -306,7 +351,9 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
                         </Text>
                       </div>
                       <Group gap={6} wrap="nowrap">
-                        {it.notes.some((n) => n.level === 'warn') && <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" />}
+                        {it.notes.some((n) => n.level === 'warn') && (
+                          <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" />
+                        )}
                         <ActionBadge action={it.action} />
                       </Group>
                     </Group>
@@ -340,7 +387,9 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
                 loading={apply.isPending}
                 onClick={() => apply.mutate()}
               >
-                {toWrite.length === 0 ? 'Nada a aplicar' : `Aplicar ${toWrite.length} ${toWrite.length === 1 ? 'objeto' : 'objetos'}`}
+                {toWrite.length === 0
+                  ? 'Nada a aplicar'
+                  : `Aplicar ${toWrite.length} ${toWrite.length === 1 ? 'objeto' : 'objetos'}`}
               </Button>
             </Group>
           </Group>

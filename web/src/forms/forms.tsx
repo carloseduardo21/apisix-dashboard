@@ -17,7 +17,17 @@ import {
 import { IconInfoCircle } from '@tabler/icons-react'
 import { PluginsEditor } from '../schema/PluginsEditor'
 import { isObj, setKey, type Obj } from '../schema/types'
-import { AdvancedFields, LabelsField, NameDesc, OneOrMany, ResourceSelect, Section, str, textProps, type FormProps } from './common'
+import {
+  AdvancedFields,
+  LabelsField,
+  NameDesc,
+  OneOrMany,
+  ResourceSelect,
+  Section,
+  str,
+  textProps,
+  type FormProps,
+} from './common'
 import { UPSTREAM_HANDLED, UpstreamFields } from './UpstreamForm'
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'CONNECT', 'TRACE', 'PURGE']
@@ -31,7 +41,15 @@ function Sections({ initial, children }: { initial: string[]; children: React.Re
   )
 }
 
-function StatusSwitch({ value, onChange, label = 'Ativo' }: { value: Obj; onChange: (v: Obj) => void; label?: string }) {
+function StatusSwitch({
+  value,
+  onChange,
+  label = 'Ativo',
+}: {
+  value: Obj
+  onChange: (v: Obj) => void
+  label?: string
+}) {
   return (
     <Switch
       label={label}
@@ -44,14 +62,29 @@ function StatusSwitch({ value, onChange, label = 'Ativo' }: { value: Obj; onChan
 type Target = 'upstream_id' | 'upstream' | 'service_id' | 'none'
 
 /** Where a route/service sends traffic: a shared upstream, an inline one or a service. */
-function Destination({ value, onChange, allowService, allowNone }: { value: Obj; onChange: (v: Obj) => void; allowService?: boolean; allowNone?: boolean }) {
+function Destination({
+  value,
+  onChange,
+  allowService,
+  allowNone,
+}: {
+  value: Obj
+  onChange: (v: Obj) => void
+  allowService?: boolean
+  allowNone?: boolean
+}) {
   const current: Target =
-    value.upstream_id !== undefined ? 'upstream_id'
-    : value.upstream !== undefined ? 'upstream'
-    : allowService && value.service_id !== undefined ? 'service_id'
-    : 'none'
+    value.upstream_id !== undefined
+      ? 'upstream_id'
+      : value.upstream !== undefined
+        ? 'upstream'
+        : allowService && value.service_id !== undefined
+          ? 'service_id'
+          : 'none'
   // A new object without plugins most likely points to an existing upstream.
-  const [target, setTarget] = useState<Target>(current === 'none' && (!allowNone || !isObj(value.plugins)) ? 'upstream_id' : current)
+  const [target, setTarget] = useState<Target>(
+    current === 'none' && (!allowNone || !isObj(value.plugins)) ? 'upstream_id' : current,
+  )
 
   const choose = (t: Target) => {
     setTarget(t)
@@ -72,7 +105,13 @@ function Destination({ value, onChange, allowService, allowNone }: { value: Obj;
     <Stack gap="sm">
       <SegmentedControl value={target} onChange={(t) => choose(t as Target)} data={options} w="fit-content" />
       {target === 'upstream_id' && (
-        <ResourceSelect resource="upstreams" label="Upstream" required value={value.upstream_id} onChange={(v) => onChange(setKey(value, 'upstream_id', v))} />
+        <ResourceSelect
+          resource="upstreams"
+          label="Upstream"
+          required
+          value={value.upstream_id}
+          onChange={(v) => onChange(setKey(value, 'upstream_id', v))}
+        />
       )}
       {target === 'service_id' && (
         <ResourceSelect
@@ -85,7 +124,11 @@ function Destination({ value, onChange, allowService, allowNone }: { value: Obj;
         />
       )}
       {target === 'upstream' && (
-        <UpstreamFields embedded value={isObj(value.upstream) ? value.upstream : {}} onChange={(u) => onChange(setKey(value, 'upstream', u))} />
+        <UpstreamFields
+          embedded
+          value={isObj(value.upstream) ? value.upstream : {}}
+          onChange={(u) => onChange(setKey(value, 'upstream', u))}
+        />
       )}
       {target === 'none' && (
         <Text size="sm" c="dimmed">
@@ -109,8 +152,25 @@ function RouteForm({ value, onChange }: FormProps) {
       </Section>
       <Section value="match" title="Correspondência" hint="Quais requisições esta route atende">
         <Stack gap="sm">
-          <OneOrMany value={value} onChange={onChange} single="uri" many="uris" label="URIs" required placeholder="/api/*" description="Use * no final para prefixo. Enter para adicionar." />
-          <OneOrMany value={value} onChange={onChange} single="host" many="hosts" label="Hosts" placeholder="api.exemplo.com.br" description="Vazio = qualquer host. Aceita *.dominio." />
+          <OneOrMany
+            value={value}
+            onChange={onChange}
+            single="uri"
+            many="uris"
+            label="URIs"
+            required
+            placeholder="/api/*"
+            description="Use * no final para prefixo. Enter para adicionar."
+          />
+          <OneOrMany
+            value={value}
+            onChange={onChange}
+            single="host"
+            many="hosts"
+            label="Hosts"
+            placeholder="api.exemplo.com.br"
+            description="Vazio = qualquer host. Aceita *.dominio."
+          />
           <MultiSelect
             label="Métodos"
             description="Vazio = todos os métodos"
@@ -121,7 +181,14 @@ function RouteForm({ value, onChange }: FormProps) {
             searchable
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <OneOrMany value={value} onChange={onChange} single="remote_addr" many="remote_addrs" label="IPs de origem" placeholder="10.0.0.0/8" />
+            <OneOrMany
+              value={value}
+              onChange={onChange}
+              single="remote_addr"
+              many="remote_addrs"
+              label="IPs de origem"
+              placeholder="10.0.0.0/8"
+            />
             <NumberInput
               label="Prioridade"
               description="Maior vence quando várias routes casam"
@@ -153,7 +220,25 @@ function RouteForm({ value, onChange }: FormProps) {
             schemaName="route"
             value={value}
             onChange={onChange}
-            handled={['name', 'desc', 'status', 'uri', 'uris', 'host', 'hosts', 'methods', 'remote_addr', 'remote_addrs', 'priority', 'upstream', 'upstream_id', 'service_id', 'plugin_config_id', 'plugins', 'labels']}
+            handled={[
+              'name',
+              'desc',
+              'status',
+              'uri',
+              'uris',
+              'host',
+              'hosts',
+              'methods',
+              'remote_addr',
+              'remote_addrs',
+              'priority',
+              'upstream',
+              'upstream_id',
+              'service_id',
+              'plugin_config_id',
+              'plugins',
+              'labels',
+            ]}
           />
         </Stack>
       </Section>
@@ -169,8 +254,19 @@ function ServiceForm({ value, onChange }: FormProps) {
       <Section value="general" title="Geral">
         <Stack gap="sm">
           <NameDesc value={value} onChange={onChange} />
-          <OneOrMany value={value} onChange={onChange} single="host" many="hosts" label="Hosts" placeholder="api.exemplo.com.br" />
-          <Switch label="Habilitar WebSocket" checked={value.enable_websocket === true} onChange={(e) => onChange(setKey(value, 'enable_websocket', e.currentTarget.checked || undefined))} />
+          <OneOrMany
+            value={value}
+            onChange={onChange}
+            single="host"
+            many="hosts"
+            label="Hosts"
+            placeholder="api.exemplo.com.br"
+          />
+          <Switch
+            label="Habilitar WebSocket"
+            checked={value.enable_websocket === true}
+            onChange={(e) => onChange(setKey(value, 'enable_websocket', e.currentTarget.checked || undefined))}
+          />
         </Stack>
       </Section>
       <Section value="target" title="Destino">
@@ -182,7 +278,22 @@ function ServiceForm({ value, onChange }: FormProps) {
       <Section value="advanced" title="Avançado">
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
-          <AdvancedFields schemaName="service" value={value} onChange={onChange} handled={['name', 'desc', 'hosts', 'host', 'enable_websocket', 'upstream', 'upstream_id', 'plugins', 'labels']} />
+          <AdvancedFields
+            schemaName="service"
+            value={value}
+            onChange={onChange}
+            handled={[
+              'name',
+              'desc',
+              'hosts',
+              'host',
+              'enable_websocket',
+              'upstream',
+              'upstream_id',
+              'plugins',
+              'labels',
+            ]}
+          />
         </Stack>
       </Section>
     </Sections>
@@ -215,11 +326,20 @@ function ConsumerForm({ value, onChange, isNew }: FormProps) {
             {...textProps(value, onChange, 'username')}
           />
           <Textarea label="Descrição" autosize minRows={1} {...textProps(value, onChange, 'desc')} />
-          <ResourceSelect resource="consumer_groups" label="Consumer group" value={value.group_id} onChange={(v) => onChange(setKey(value, 'group_id', v))} />
+          <ResourceSelect
+            resource="consumer_groups"
+            label="Consumer group"
+            value={value.group_id}
+            onChange={(v) => onChange(setKey(value, 'group_id', v))}
+          />
           <LabelsField value={value} onChange={onChange} />
         </Stack>
       </Section>
-      <Section value="plugins" title="Plugins" hint="Prefira cadastrar a autenticação em Credenciais; aqui ficam os demais plugins do consumer">
+      <Section
+        value="plugins"
+        title="Plugins"
+        hint="Prefira cadastrar a autenticação em Credenciais; aqui ficam os demais plugins do consumer"
+      >
         <PluginsEditor consumer value={value.plugins as Obj} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
       </Section>
     </Sections>
@@ -235,9 +355,15 @@ function CredentialForm({ value, onChange }: FormProps) {
       <LabelsField value={value} onChange={onChange} />
       <Text fw={500}>Autenticação</Text>
       <Text size="sm" c="dimmed">
-        Somente plugins de autenticação (key-auth, basic-auth, jwt-auth, hmac-auth...). Os segredos são cifrados pelo APISIX e mascarados na dashboard.
+        Somente plugins de autenticação (key-auth, basic-auth, jwt-auth, hmac-auth...). Os segredos são cifrados pelo
+        APISIX e mascarados na dashboard.
       </Text>
-      <PluginsEditor consumer authOnly value={value.plugins as Obj} onChange={(p) => onChange({ ...value, plugins: p ?? {} })} />
+      <PluginsEditor
+        consumer
+        authOnly
+        value={value.plugins as Obj}
+        onChange={(p) => onChange({ ...value, plugins: p ?? {} })}
+      />
     </Stack>
   )
 }
@@ -250,7 +376,10 @@ function PluginsOnlyForm({ value, onChange, withName }: FormProps & { withName?:
       {withName && <NameDesc value={value} onChange={onChange} />}
       {withName && <LabelsField value={value} onChange={onChange} />}
       <Text fw={500}>Plugins</Text>
-      <PluginsEditor value={value.plugins as Obj} onChange={(p) => onChange({ ...setKey(value, 'plugins', p), plugins: p ?? {} })} />
+      <PluginsEditor
+        value={value.plugins as Obj}
+        onChange={(p) => onChange({ ...setKey(value, 'plugins', p), plugins: p ?? {} })}
+      />
     </Stack>
   )
 }
@@ -274,7 +403,16 @@ function SslForm({ value, onChange }: FormProps) {
     <Sections initial={['cert']}>
       <Section value="cert" title="Certificado">
         <Stack gap="sm">
-          <OneOrMany value={value} onChange={onChange} single="sni" many="snis" label="SNIs" required placeholder="api.exemplo.com.br" description="Domínios atendidos por este certificado. Aceita *.dominio." />
+          <OneOrMany
+            value={value}
+            onChange={onChange}
+            single="sni"
+            many="snis"
+            label="SNIs"
+            required
+            placeholder="api.exemplo.com.br"
+            description="Domínios atendidos por este certificado. Aceita *.dominio."
+          />
           <Textarea
             label="Certificado (PEM)"
             withAsterisk
@@ -312,7 +450,7 @@ function SslForm({ value, onChange }: FormProps) {
               ]}
               value={str(value.type) || 'server'}
               allowDeselect={false}
-              onChange={(v) => onChange(setKey(value, 'type', v === 'server' ? undefined : v ?? undefined))}
+              onChange={(v) => onChange(setKey(value, 'type', v === 'server' ? undefined : (v ?? undefined)))}
             />
             <StatusSwitch value={value} onChange={onChange} />
           </SimpleGrid>
@@ -321,7 +459,12 @@ function SslForm({ value, onChange }: FormProps) {
       <Section value="advanced" title="Avançado" hint="mTLS de clientes, protocolos, certificados adicionais">
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
-          <AdvancedFields schemaName="ssl" value={value} onChange={onChange} handled={['sni', 'snis', 'cert', 'key', 'type', 'status', 'labels']} />
+          <AdvancedFields
+            schemaName="ssl"
+            value={value}
+            onChange={onChange}
+            handled={['sni', 'snis', 'cert', 'key', 'type', 'status', 'labels']}
+          />
         </Stack>
       </Section>
     </Sections>
@@ -343,7 +486,11 @@ function StreamRouteForm({ value, onChange }: FormProps) {
               value={typeof value.server_port === 'number' ? value.server_port : ''}
               onChange={(v) => onChange(setKey(value, 'server_port', typeof v === 'number' ? v : undefined))}
             />
-            <TextInput label="Endereço do gateway" placeholder="0.0.0.0" {...textProps(value, onChange, 'server_addr')} />
+            <TextInput
+              label="Endereço do gateway"
+              placeholder="0.0.0.0"
+              {...textProps(value, onChange, 'server_addr')}
+            />
             <TextInput label="IP de origem" placeholder="10.0.0.0/8" {...textProps(value, onChange, 'remote_addr')} />
             <TextInput label="SNI" description="Para tráfego TLS" {...textProps(value, onChange, 'sni')} />
           </SimpleGrid>
@@ -353,7 +500,11 @@ function StreamRouteForm({ value, onChange }: FormProps) {
         <Destination value={value} onChange={onChange} />
       </Section>
       <Section value="plugins" title="Plugins">
-        <PluginsEditor subsystem="stream" value={value.plugins as Obj} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
+        <PluginsEditor
+          subsystem="stream"
+          value={value.plugins as Obj}
+          onChange={(p) => onChange(setKey(value, 'plugins', p))}
+        />
       </Section>
       <Section value="advanced" title="Avançado">
         <Stack gap="sm">
@@ -362,7 +513,19 @@ function StreamRouteForm({ value, onChange }: FormProps) {
             schemaName="stream_route"
             value={value}
             onChange={onChange}
-            handled={['name', 'desc', 'server_port', 'server_addr', 'remote_addr', 'sni', 'upstream', 'upstream_id', 'service_id', 'plugins', 'labels']}
+            handled={[
+              'name',
+              'desc',
+              'server_port',
+              'server_addr',
+              'remote_addr',
+              'sni',
+              'upstream',
+              'upstream_id',
+              'service_id',
+              'plugins',
+              'labels',
+            ]}
           />
         </Stack>
       </Section>
@@ -396,15 +559,24 @@ function SecretForm({ value, onChange }: FormProps) {
   return (
     <Stack>
       <Alert color="blue" icon={<IconInfoCircle size={16} />}>
-        Para HashiCorp Vault use o ID no formato <code>vault/1</code>. Outros gerenciadores (aws, gcp) podem ser editados pela aba JSON.
-        Referencie segredos nos plugins com <code>$secret://vault/1/caminho/chave</code>.
+        Para HashiCorp Vault use o ID no formato <code>vault/1</code>. Outros gerenciadores (aws, gcp) podem ser
+        editados pela aba JSON. Referencie segredos nos plugins com <code>$secret://vault/1/caminho/chave</code>.
       </Alert>
-      <TextInput label="URI do Vault" withAsterisk placeholder="https://vault.interno:8200" {...textProps(value, onChange, 'uri')} />
+      <TextInput
+        label="URI do Vault"
+        withAsterisk
+        placeholder="https://vault.interno:8200"
+        {...textProps(value, onChange, 'uri')}
+      />
       <TextInput label="Prefixo" withAsterisk placeholder="kv/apisix" {...textProps(value, onChange, 'prefix')} />
       <PasswordInput
         label="Token"
         withAsterisk
-        description={value.token === '******' ? 'Token atual mascarado. Mantenha para preservar ou digite um novo.' : 'Prefira um token com política somente leitura'}
+        description={
+          value.token === '******'
+            ? 'Token atual mascarado. Mantenha para preservar ou digite um novo.'
+            : 'Prefira um token com política somente leitura'
+        }
         {...textProps(value, onChange, 'token')}
       />
       <TextInput label="Namespace" description="Vault Enterprise" {...textProps(value, onChange, 'namespace')} />

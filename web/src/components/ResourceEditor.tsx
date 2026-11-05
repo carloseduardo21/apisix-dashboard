@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Group, JsonInput, Modal, ScrollArea, Stack, Tabs, Text, TextInput, ThemeIcon } from '@mantine/core'
+import {
+  Alert,
+  Button,
+  Group,
+  JsonInput,
+  Modal,
+  ScrollArea,
+  Stack,
+  Tabs,
+  Text,
+  TextInput,
+  ThemeIcon,
+} from '@mantine/core'
 import { IconAlertCircle, IconCode, IconForms, IconInfoCircle } from '@tabler/icons-react'
 import { FORMS } from '../forms/forms'
 import type { Obj } from '../schema/types'
@@ -96,7 +108,9 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
             <def.icon size={20} stroke={1.6} />
           </ThemeIcon>
           <div>
-            <Text fw={700}>{editing ? `Editar ${def.singular}` : `${def.feminine ? 'Nova' : 'Novo'} ${def.singular}`}</Text>
+            <Text fw={700}>
+              {editing ? `Editar ${def.singular}` : `${def.feminine ? 'Nova' : 'Novo'} ${def.singular}`}
+            </Text>
             <Text size="xs" c="dimmed" ff={editing ? 'monospace' : undefined}>
               {editing ? editing.id : def.description}
             </Text>
@@ -112,10 +126,13 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
             label="ID"
             withAsterisk={idMode === 'required'}
             description={
-              idMode === 'optional' ? 'Opcional: deixe vazio para o APISIX gerar'
-              : def.key === 'secrets' ? 'Formato gerenciador/id, ex.: vault/1'
-              : def.key === 'credentials' ? 'Letras, números, ".", "_" ou "-", ex.: app-pagamentos'
-              : undefined
+              idMode === 'optional'
+                ? 'Opcional: deixe vazio para o APISIX gerar'
+                : def.key === 'secrets'
+                  ? 'Formato gerenciador/id, ex.: vault/1'
+                  : def.key === 'credentials'
+                    ? 'Letras, números, ".", "_" ou "-", ex.: app-pagamentos'
+                    : undefined
             }
             value={id}
             onChange={(e) => setId(e.currentTarget.value)}

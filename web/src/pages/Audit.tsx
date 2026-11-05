@@ -92,7 +92,11 @@ export function Audit() {
   const events = useMemo(() => {
     const all = q.data?.pages.flatMap((p) => p.items) ?? []
     const s = search.trim().toLowerCase()
-    return all.filter(FILTERS[filter]).filter((e) => !s || [e.actor, e.ip, e.action, e.resource, e.resource_id, e.detail].join(' ').toLowerCase().includes(s))
+    return all
+      .filter(FILTERS[filter])
+      .filter(
+        (e) => !s || [e.actor, e.ip, e.action, e.resource, e.resource_id, e.detail].join(' ').toLowerCase().includes(s),
+      )
   }, [q.data, filter, search])
 
   return (
@@ -102,7 +106,12 @@ export function Audit() {
         title="Auditoria"
         description="Autenticação, gestão de usuários e alterações no APISIX. Segredos são mascarados."
         actions={
-          <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={() => q.refetch()} loading={q.isFetching && !q.isFetchingNextPage}>
+          <Button
+            variant="default"
+            leftSection={<IconRefresh size={16} />}
+            onClick={() => q.refetch()}
+            loading={q.isFetching && !q.isFetchingNextPage}
+          >
             Atualizar
           </Button>
         }
@@ -129,7 +138,11 @@ export function Audit() {
           />
         </Group>
         {events.length === 0 && !q.isPending ? (
-          <EmptyState icon={IconHistory} title="Nenhum evento" description="Nenhum evento corresponde ao filtro selecionado." />
+          <EmptyState
+            icon={IconHistory}
+            title="Nenhum evento"
+            description="Nenhum evento corresponde ao filtro selecionado."
+          />
         ) : (
           <Table.ScrollContainer minWidth={900}>
             <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
@@ -171,10 +184,16 @@ export function Audit() {
                       {e.resource ? (
                         <Text size="sm" ff="monospace">
                           {e.resource}
-                          {e.resource_id && <Text span c="dimmed" ff="monospace">/{e.resource_id}</Text>}
+                          {e.resource_id && (
+                            <Text span c="dimmed" ff="monospace">
+                              /{e.resource_id}
+                            </Text>
+                          )}
                         </Text>
                       ) : (
-                        <Text size="sm" c="dimmed">—</Text>
+                        <Text size="sm" c="dimmed">
+                          —
+                        </Text>
                       )}
                     </Table.Td>
                     <Table.Td>
@@ -202,7 +221,12 @@ export function Audit() {
         )}
       </Card>
 
-      <Modal opened={!!selected} onClose={() => setSelected(null)} size="90%" title={<Text fw={600}>Evento #{selected?.id}</Text>}>
+      <Modal
+        opened={!!selected}
+        onClose={() => setSelected(null)}
+        size="90%"
+        title={<Text fw={600}>Evento #{selected?.id}</Text>}
+      >
         {selected && (
           <Stack>
             <Group gap="sm">
