@@ -296,10 +296,10 @@ func TestMakeID(t *testing.T) {
 
 func TestCaptureGroups(t *testing.T) {
 	for re, want := range map[string]int{
-		`^/a/(\d+)`:            1,
-		`^(?:/a)/(?<id>\d+)`:   1,
+		`^/a/(\d+)`:           1,
+		`^(?:/a)/(?<id>\d+)`:  1,
 		`^/(a|b)/([0-9]+)\(x`: 2,
-		`^/[(]x(?=y)`:          0,
+		`^/[(]x(?=y)`:         0,
 	} {
 		if got := captureGroups(re); got != want {
 			t.Errorf("captureGroups(%q) = %d, want %d", re, got, want)

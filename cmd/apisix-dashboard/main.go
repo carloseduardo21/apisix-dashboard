@@ -129,7 +129,7 @@ func auditWriter() (io.Writer, error) {
 	case "none":
 		return nil, nil
 	default:
-		return os.OpenFile(dest, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		return os.OpenFile(dest, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 G703 -- audit log path comes from operator config (DASH_AUDIT_LOG)
 	}
 }
 
@@ -289,10 +289,14 @@ func healthcheck() error {
 	if os.Getenv("DASH_TLS_CERT_FILE") != "" {
 		scheme = "https"
 		// Loopback only: the certificate is issued for the public name.
-		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- loopback-only healthcheck; the certificate is issued for the public name
 	}
 	c := &http.Client{Timeout: 3 * time.Second, Transport: tr}
-	resp, err := c.Get(scheme + "://127.0.0.1:" + port + "/api/health")
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, scheme+"://127.0.0.1:"+port+"/api/health", nil) // #nosec G704 -- fixed loopback URL
+	if err != nil {
+		return err
+	}
+	resp, err := c.Do(req) // #nosec G107 G704 -- fixed loopback URL; only the port comes from operator config
 	if err != nil {
 		return err
 	}

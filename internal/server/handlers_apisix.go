@@ -35,7 +35,7 @@ func (s *Server) handleSchemas(w http.ResponseWriter, r *http.Request, p *princi
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
+	_, _ = w.Write(data) // client may have gone away; nothing to do
 }
 
 // writeAdminResponse relays an Admin API response with secrets masked.
@@ -91,7 +91,7 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request, p *princi
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(resp.Status)
-	w.Write(resp.Body)
+	_, _ = w.Write(resp.Body) // client may have gone away; nothing to do
 }
 
 func (s *Server) handleAPISIX(w http.ResponseWriter, r *http.Request, p *principal) {

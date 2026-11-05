@@ -208,7 +208,7 @@ func (s *Server) clientIP(r *http.Request) string {
 }
 
 func (s *Server) setCookie(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- HttpOnly+SameSite=Strict; Secure is configurable (DASH_COOKIE_SECURE) and defaults to true
 		Name:     cookieName,
 		Value:    token,
 		Path:     "/",
@@ -219,7 +219,7 @@ func (s *Server) setCookie(w http.ResponseWriter, token string) {
 }
 
 func (s *Server) clearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- same attributes as setCookie
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
@@ -236,7 +236,7 @@ func (s *Server) clearCookie(w http.ResponseWriter) {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v) // headers already sent; client may have gone away
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

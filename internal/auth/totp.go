@@ -3,7 +3,7 @@ package auth
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- HMAC-SHA1 is mandated by RFC 6238/4226 for authenticator app compatibility
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/binary"
@@ -40,7 +40,7 @@ func totpURI(issuer, account string, secret []byte) string {
 
 func totpCode(secret []byte, step int64) string {
 	var msg [8]byte
-	binary.BigEndian.PutUint64(msg[:], uint64(step))
+	binary.BigEndian.PutUint64(msg[:], uint64(step)) // #nosec G115 -- TOTP time step is always positive
 	m := hmac.New(sha1.New, secret)
 	m.Write(msg[:])
 	sum := m.Sum(nil)

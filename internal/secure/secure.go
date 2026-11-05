@@ -21,7 +21,7 @@ const KeySize = 32
 // LoadKey reads a 32-byte key stored raw, hex or base64 encoded.
 // When create is true and the file does not exist, a new key is generated.
 func LoadKey(path string, create bool) (key []byte, created bool, err error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- key path comes from operator config
 	if errors.Is(err, os.ErrNotExist) && create {
 		key = make([]byte, KeySize)
 		rand.Read(key)

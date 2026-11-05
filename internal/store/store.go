@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // SQLite driver (pure Go, registers "sqlite")
 )
 
 var (
@@ -126,7 +126,7 @@ type Store struct{ db *sql.DB }
 
 func Open(path string) (*Store, error) {
 	// Create the file up front so it is not world readable.
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- database path derived from DASH_DATA_DIR
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func Open(path string) (*Store, error) {
 	// A single connection serializes writes and keeps SQLite happy; the
 	// dashboard has very low traffic.
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.ExecContext(context.Background(), schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}

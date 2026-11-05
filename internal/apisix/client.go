@@ -29,7 +29,7 @@ func NewClient(baseURL, key, caFile string, timeout time.Duration) (*Client, err
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	if caFile != "" {
-		pem, err := os.ReadFile(caFile)
+		pem, err := os.ReadFile(caFile) // #nosec G304 -- CA path comes from operator config
 		if err != nil {
 			return nil, fmt.Errorf("admin api CA: %w", err)
 		}

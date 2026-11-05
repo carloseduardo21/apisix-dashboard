@@ -187,7 +187,7 @@ func env(key, def string) string {
 
 func secret(key string) (string, error) {
 	if path := env(key+"_FILE", ""); path != "" {
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) // #nosec G304 -- *_FILE secret path set by the operator (e.g. /run/secrets)
 		if err != nil {
 			return "", fmt.Errorf("%s_FILE: %w", key, err)
 		}

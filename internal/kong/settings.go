@@ -156,7 +156,7 @@ func (s *Settings) Validate() error {
 			if r.Template == nil {
 				errs = append(errs, fmt.Errorf("regra %d: informe o template (objeto JSON)", n))
 			} else if err := checkTemplate(r.Template); err != nil {
-				errs = append(errs, fmt.Errorf("regra %d: %v", n, err))
+				errs = append(errs, fmt.Errorf("regra %d: %w", n, err))
 			}
 		default:
 			errs = append(errs, fmt.Errorf("regra %d: ação inválida", n))
