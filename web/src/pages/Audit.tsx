@@ -21,40 +21,16 @@ import { api, type AuditEvent } from '../api'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { avatarColor, initials } from '../components/roles'
+import { useTranslation } from 'react-i18next'
+import { dynamicText, formatDate, formatDateTime, formatTime } from '../i18n/format'
 
 interface Page {
   items: AuditEvent[]
   next_before?: number
 }
 
-const LABELS: Record<string, string> = {
-  'auth.login': 'login',
-  'auth.logout': 'logout',
-  'auth.password': 'senha validada',
-  'auth.mfa': 'MFA',
-  'auth.mfa_enroll': 'MFA configurado',
-  'auth.lockout': 'conta bloqueada',
-  'auth.password_change': 'troca de senha',
-  'apisix.create': 'criou',
-  'apisix.put': 'salvou',
-  'apisix.patch': 'alterou',
-  'apisix.delete': 'excluiu',
-  'user.create': 'criou usuário',
-  'user.update': 'alterou usuário',
-  'user.delete': 'excluiu usuário',
-  'user.password_reset': 'redefiniu senha',
-  'user.mfa_reset': 'redefiniu MFA',
-  'user.unlock': 'desbloqueou',
-  'acme.create': 'cadastrou certificado',
-  'acme.issue': 'emitiu certificado',
-  'acme.delete': 'removeu certificado',
-  'kong.migrate': 'migrou do Kong',
-  'kong.rollback': 'desfez migração',
-  'kong.migration': 'lote de migração',
-  'kong.settings': 'padrões da migração',
-}
-
-export const actionLabel = (a: string) => LABELS[a] ?? a
+/** Audit action name in the current language (unknown actions are shown as-is). */
+export const actionLabel = (a: string) => dynamicText(`audit.actions.${a}`, a)
 
 export function actionColor(a: string) {
   if (a === 'apisix.delete' || a === 'user.delete' || a === 'auth.lockout') return 'red'
@@ -79,6 +55,7 @@ const FILTERS: Record<Filter, (e: AuditEvent) => boolean> = {
 }
 
 export function Audit() {
+  const { t } = useTranslation()
   const [selected, setSelected] = useState<AuditEvent | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
@@ -103,8 +80,8 @@ export function Audit() {
     <>
       <PageHeader
         icon={IconHistory}
-        title="Auditoria"
-        description="Autenticação, gestão de usuários e alterações no APISIX. Segredos são mascarados."
+        title={t('audit.title')}
+        description={t('audit.description')}
         actions={
           <Button
             variant="default"
@@ -112,7 +89,7 @@ export function Audit() {
             onClick={() => q.refetch()}
             loading={q.isFetching && !q.isFetchingNextPage}
           >
-            Atualizar
+            {t('audit.refresh')}
           </Button>
         }
       />
@@ -123,14 +100,14 @@ export function Audit() {
             value={filter}
             onChange={(v) => setFilter(v)}
             data={[
-              { value: 'all', label: 'Todos' },
-              { value: 'changes', label: 'Alterações' },
-              { value: 'auth', label: 'Acessos' },
-              { value: 'failures', label: 'Falhas' },
+              { value: 'all', label: t('audit.filter_all') },
+              { value: 'changes', label: t('audit.filter_changes') },
+              { value: 'auth', label: t('audit.filter_auth') },
+              { value: 'failures', label: t('audit.filter_failures') },
             ]}
           />
           <TextInput
-            placeholder="Buscar usuário, IP, recurso..."
+            placeholder={t('audit.search')}
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => setSearch(e.currentTarget.value)}
@@ -138,31 +115,27 @@ export function Audit() {
           />
         </Group>
         {events.length === 0 && !q.isPending ? (
-          <EmptyState
-            icon={IconHistory}
-            title="Nenhum evento"
-            description="Nenhum evento corresponde ao filtro selecionado."
-          />
+          <EmptyState icon={IconHistory} title={t('audit.empty')} description={t('audit.empty_desc')} />
         ) : (
           <Table.ScrollContainer minWidth={900}>
             <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
               <Table.Thead bg="var(--mantine-color-default-hover)">
                 <Table.Tr>
-                  <Table.Th>Quando</Table.Th>
-                  <Table.Th>Usuário</Table.Th>
-                  <Table.Th>Ação</Table.Th>
-                  <Table.Th>Recurso</Table.Th>
+                  <Table.Th>{t('audit.col_when')}</Table.Th>
+                  <Table.Th>{t('audit.col_user')}</Table.Th>
+                  <Table.Th>{t('audit.col_action')}</Table.Th>
+                  <Table.Th>{t('audit.col_resource')}</Table.Th>
                   <Table.Th>IP</Table.Th>
-                  <Table.Th>Detalhe</Table.Th>
+                  <Table.Th>{t('audit.col_detail')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {events.map((e) => (
                   <Table.Tr key={e.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(e)}>
                     <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                      <Text size="sm">{new Date(e.ts).toLocaleDateString('pt-BR')}</Text>
+                      <Text size="sm">{formatDate(e.ts)}</Text>
                       <Text size="xs" c="dimmed">
-                        {new Date(e.ts).toLocaleTimeString('pt-BR')}
+                        {formatTime(e.ts)}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -177,7 +150,9 @@ export function Audit() {
                     </Table.Td>
                     <Table.Td style={{ whiteSpace: 'nowrap' }}>
                       <Badge variant="light" color={e.outcome === 'failure' ? 'red' : actionColor(e.action)}>
-                        {e.outcome === 'failure' ? `${actionLabel(e.action)} · falhou` : actionLabel(e.action)}
+                        {e.outcome === 'failure'
+                          ? t('audit.failed', { action: actionLabel(e.action) })
+                          : actionLabel(e.action)}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -215,7 +190,7 @@ export function Audit() {
         {q.hasNextPage && (
           <Group justify="center" p="md">
             <Button variant="default" onClick={() => q.fetchNextPage()} loading={q.isFetchingNextPage}>
-              Carregar mais
+              {t('audit.load_more')}
             </Button>
           </Group>
         )}
@@ -225,7 +200,7 @@ export function Audit() {
         opened={!!selected}
         onClose={() => setSelected(null)}
         size="90%"
-        title={<Text fw={600}>Evento #{selected?.id}</Text>}
+        title={<Text fw={600}>{t('audit.event', { id: selected?.id })}</Text>}
       >
         {selected && (
           <Stack>
@@ -241,7 +216,7 @@ export function Audit() {
                   </Badge>
                 </Text>
                 <Text size="sm" c="dimmed">
-                  {new Date(selected.ts).toLocaleString('pt-BR')} · {selected.ip || 'sem IP'}
+                  {formatDateTime(selected.ts)} · {selected.ip || t('common.no_ip')}
                   {selected.resource && ` · ${selected.resource}/${selected.resource_id ?? ''}`}
                 </Text>
               </div>
@@ -252,7 +227,7 @@ export function Audit() {
                 {(['before', 'after'] as const).map((k) => (
                   <div key={k}>
                     <Text fw={600} mb={6} size="sm">
-                      {k === 'before' ? 'Antes' : 'Depois'}
+                      {k === 'before' ? t('audit.before') : t('audit.after')}
                     </Text>
                     <ScrollArea.Autosize mah="60vh">
                       <Code block>{json(selected[k])}</Code>

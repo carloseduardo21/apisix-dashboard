@@ -42,3 +42,8 @@ const date = (v: string | number | Date) => (v instanceof Date ? v : new Date(v)
 export const formatDateTime = (v: string | number | Date) => date(v).toLocaleString(i18n.language)
 export const formatDate = (v: string | number | Date) => date(v).toLocaleDateString(i18n.language)
 export const formatTime = (v: string | number | Date) => date(v).toLocaleTimeString(i18n.language)
+
+/** Translates a key built from runtime data (e.g. an audit action), or returns the fallback. */
+export function dynamicText(key: string, fallback: string, params?: Record<string, unknown>): string {
+  return i18n.exists(key) ? translateDynamic(key, params) : fallback
+}
