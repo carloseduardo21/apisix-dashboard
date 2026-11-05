@@ -88,7 +88,7 @@ export function Layout() {
   )
 
   const actions: SpotlightActionData[] = [
-    { id: 'home', label: 'Visão geral', description: 'Status do gateway e resumo', onClick: () => navigate('/'), leftSection: <IconGauge size={20} stroke={1.5} /> },
+    { id: 'home', label: 'Visão geral', description: 'Status do gateway e resumo', onClick: () => void navigate('/'), leftSection: <IconGauge size={20} stroke={1.5} /> },
     ...RESOURCES.map((r) => ({
       id: `go-${r.key}`,
       label: r.label,
@@ -102,7 +102,7 @@ export function Layout() {
       label: 'Certificados automáticos',
       description: "Let's Encrypt via DNS (Cloudflare)",
       keywords: ['acme', 'letsencrypt', 'renovar', 'tls'],
-      onClick: () => navigate('/certificados'),
+      onClick: () => void navigate('/certificados'),
       leftSection: <IconCertificate2 size={20} stroke={1.5} />,
     },
     ...(canWrite(me.role)
@@ -133,7 +133,7 @@ export function Layout() {
           { id: 'audit', label: 'Auditoria', description: 'Trilha de eventos', onClick: () => navigate('/auditoria'), leftSection: <IconHistory size={20} stroke={1.5} /> },
         ]
       : []),
-    { id: 'password', label: 'Alterar senha', onClick: () => navigate('/conta'), leftSection: <IconKey size={20} stroke={1.5} /> },
+    { id: 'password', label: 'Alterar senha', onClick: () => void navigate('/conta'), leftSection: <IconKey size={20} stroke={1.5} /> },
     {
       id: 'theme',
       label: scheme === 'dark' ? 'Tema claro' : 'Tema escuro',

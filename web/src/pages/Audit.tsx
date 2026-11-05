@@ -112,7 +112,7 @@ export function Audit() {
         <Group justify="space-between" p="md" gap="sm">
           <SegmentedControl
             value={filter}
-            onChange={(v) => setFilter(v as Filter)}
+            onChange={(v) => setFilter(v)}
             data={[
               { value: 'all', label: 'Todos' },
               { value: 'changes', label: 'Alterações' },

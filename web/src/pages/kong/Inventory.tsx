@@ -371,7 +371,7 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
         />
         <SegmentedControl
           value={filter}
-          onChange={(v) => setFilter(v as Filter)}
+          onChange={(v) => setFilter(v)}
           data={[
             { value: 'all', label: 'Todos' },
             { value: 'pending', label: 'A migrar' },

@@ -46,7 +46,7 @@ function Choice<T extends string>({
       <Text size="xs" c="dimmed" mb={6}>
         {description}
       </Text>
-      <SegmentedControl fullWidth value={value} onChange={(v) => onChange(v as T)} data={data} />
+      <SegmentedControl fullWidth value={value} onChange={(v) => onChange(v)} data={data} />
     </div>
   )
 }
@@ -102,7 +102,7 @@ function RuleEditor({
         />
         <SegmentedControl
           value={rule.action}
-          onChange={(v) => onChange({ ...rule, action: v as PluginRule['action'] })}
+          onChange={(v) => onChange({ ...rule, action: v })}
           data={[
             { value: 'map', label: 'Mapear' },
             { value: 'ignore', label: 'Ignorar' },
@@ -167,9 +167,9 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
     onSuccess: () => {
       setError('')
       notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Padrões salvos', message: 'O inventário foi recalculado com os novos padrões.' })
-      qc.invalidateQueries({ queryKey: ['kong'] })
+      void qc.invalidateQueries({ queryKey: ['kong'] })
     },
-    onError: (e) => setError((e as Error).message),
+    onError: (e) => setError((e).message),
   })
 
   const exampleId = `${draft.id_prefix}${draft.id_strategy === 'name' ? 'pagamentos-api' : '5d34560d-8c3c-…'}`

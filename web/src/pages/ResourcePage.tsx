@@ -125,7 +125,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
     },
     onSuccess: () => {
       notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Salvo', message: `${def.singular} salvo com sucesso` })
-      qc.invalidateQueries({ queryKey })
+      void qc.invalidateQueries({ queryKey })
     },
   })
 
@@ -133,9 +133,9 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
     mutationFn: (id: string) => api('DELETE', `/api/apisix/${def.key}/${id}`),
     onSuccess: () => {
       notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Excluído', message: `${def.singular} excluído` })
-      qc.invalidateQueries({ queryKey })
+      void qc.invalidateQueries({ queryKey })
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e as Error).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e).message }),
   })
 
   const confirmDelete = (id: string) =>
@@ -189,7 +189,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       ) : (
         error && (
           <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar" mb="md">
-            {(error as Error).message}
+            {(error).message}
           </Alert>
         )
       )}

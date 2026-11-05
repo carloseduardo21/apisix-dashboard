@@ -44,9 +44,9 @@ export function Users() {
     mutationFn: ({ method, path, body }: { method: string; path: string; body?: unknown }) => api(method, path, body),
     onSuccess: () => {
       notifications.show({ color: 'green', message: 'Alteração aplicada' })
-      qc.invalidateQueries({ queryKey: ['users'] })
+      void qc.invalidateQueries({ queryKey: ['users'] })
     },
-    onError: (e) => notifications.show({ color: 'red', message: (e as Error).message }),
+    onError: (e) => notifications.show({ color: 'red', message: (e).message }),
   })
 
   const confirm = (title: string, text: string, run: () => void, danger = false) =>
@@ -224,7 +224,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
     mutationFn: () => api('POST', '/api/users', { username, role, password }),
     onSuccess: () => {
       notifications.show({ color: 'green', message: `Usuário ${username} criado` })
-      qc.invalidateQueries({ queryKey: ['users'] })
+      void qc.invalidateQueries({ queryKey: ['users'] })
       setUsername('')
       setPassword('')
       onClose()
@@ -233,7 +233,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
   return (
     <Modal opened={opened} onClose={onClose} title="Novo usuário">
       <Stack>
-        {create.error && <Alert color="red">{(create.error as Error).message}</Alert>}
+        {create.error && <Alert color="red">{(create.error).message}</Alert>}
         <TextInput label="Usuário" value={username} onChange={(e) => setUsername(e.currentTarget.value)} required />
         <Select label="Perfil" data={ROLES} value={role} onChange={(v) => v && setRole(v)} allowDeselect={false} />
         <PasswordInput
@@ -263,7 +263,7 @@ function ResetPasswordModal({ user, onClose }: { user: DashboardUser | null; onC
     mutationFn: () => api('POST', `/api/users/${user!.id}/password`, { password }),
     onSuccess: () => {
       notifications.show({ color: 'green', message: 'Senha temporária definida' })
-      qc.invalidateQueries({ queryKey: ['users'] })
+      void qc.invalidateQueries({ queryKey: ['users'] })
       setPassword('')
       onClose()
     },
@@ -271,7 +271,7 @@ function ResetPasswordModal({ user, onClose }: { user: DashboardUser | null; onC
   return (
     <Modal opened={!!user} onClose={onClose} title={`Senha temporária para ${user?.username ?? ''}`}>
       <Stack>
-        {reset.error && <Alert color="red">{(reset.error as Error).message}</Alert>}
+        {reset.error && <Alert color="red">{(reset.error).message}</Alert>}
         <PasswordInput
           label="Nova senha temporária"
           description="As sessões do usuário serão encerradas e ele deverá trocar a senha no próximo login."

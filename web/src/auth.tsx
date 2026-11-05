@@ -38,7 +38,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // Any 401 from the API means the session expired: drop cached data.
     setUnauthorizedHandler(() => {
       qc.clear()
-      refetch()
+      void refetch()
     })
   }, [qc, refetch])
 

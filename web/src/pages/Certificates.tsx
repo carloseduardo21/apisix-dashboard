@@ -375,10 +375,10 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
     mutationFn: () => api('POST', '/api/acme/certificates', { domains, environment: env, key_type: keyType, ssl_id: sslId.trim(), replace }),
     onSuccess: () => {
       notifications.show({ color: 'indigo', icon: <IconClockHour4 size={18} />, title: 'Emissão iniciada', message: 'Acompanhe o progresso no card do certificado.' })
-      qc.invalidateQueries({ queryKey: ['acme'] })
+      void qc.invalidateQueries({ queryKey: ['acme'] })
       close()
     },
-    onError: (e) => setError((e as Error).message),
+    onError: (e) => setError((e).message),
   })
 
   const close = () => {
@@ -503,24 +503,24 @@ export function Certificates() {
   const issue = useMutation({
     mutationFn: (id: number) => api('POST', `/api/acme/certificates/${id}/issue`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['acme'] }),
-    onError: (e) => notifications.show({ color: 'red', title: 'Não foi possível iniciar', message: (e as Error).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Não foi possível iniciar', message: (e).message }),
   })
   const remove = useMutation({
     mutationFn: ({ id, ssl }: { id: number; ssl: boolean }) => api('DELETE', `/api/acme/certificates/${id}${ssl ? '?delete_ssl=true' : ''}`),
     onSuccess: () => {
       notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title: 'Removido', message: 'O certificado não será mais renovado.' })
-      qc.invalidateQueries({ queryKey: ['acme'] })
-      qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
+      void qc.invalidateQueries({ queryKey: ['acme'] })
+      void qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
       setDeleting(null)
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao remover', message: (e as Error).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao remover', message: (e).message }),
   })
 
   // Refresh the SSL list once an issuance finishes.
   const issuing = certs.filter((c) => c.status === 'issuing').length
   const prevIssuing = useRef(0)
   useEffect(() => {
-    if (issuing < prevIssuing.current) qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
+    if (issuing < prevIssuing.current) void qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
     prevIssuing.current = issuing
   }, [issuing, qc])
 
@@ -551,7 +551,7 @@ export function Certificates() {
         <Skeleton h={160} />
       ) : q.error ? (
         <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar">
-          {(q.error as Error).message}
+          {(q.error).message}
         </Alert>
       ) : !q.data?.enabled ? (
         <SetupHelp />

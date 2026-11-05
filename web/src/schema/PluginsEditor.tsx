@@ -64,7 +64,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
   if (catalog.error) {
     return (
       <Alert color="red" icon={<IconAlertCircle size={16} />}>
-        Não foi possível carregar os schemas de plugins: {(catalog.error as Error).message}
+        Não foi possível carregar os schemas de plugins: {(catalog.error).message}
       </Alert>
     )
   }
@@ -109,7 +109,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
         <Accordion multiple value={open} onChange={setOpen} variant="separated" chevronPosition="left">
           {enabled.map((name) => {
             const info = available?.[name]
-            const conf = isObj(plugins[name]) ? (plugins[name] as Obj) : {}
+            const conf = isObj(plugins[name]) ? (plugins[name]) : {}
             const meta = isObj(conf._meta) ? conf._meta : {}
             const disabled = meta.disable === true
             const schema: JSONSchema | undefined = info && (consumer && info.consumer_schema ? info.consumer_schema : info.schema)
@@ -151,7 +151,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                         <SegmentedControl
                           size="xs"
                           value={mode}
-                          onChange={(m) => setModes((s) => ({ ...s, [name]: m as 'form' | 'json' }))}
+                          onChange={(m) => setModes((s) => ({ ...s, [name]: m }))}
                           data={[
                             { value: 'form', label: 'Formulário', disabled: !schema },
                             { value: 'json', label: 'JSON' },

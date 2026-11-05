@@ -239,13 +239,13 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
   })
   const current = job.data?.job?.id === jobId ? job.data?.job : undefined
   useEffect(() => {
-    if (current && current.status !== 'running') qc.invalidateQueries({ queryKey: ['kong'] })
+    if (current && current.status !== 'running') void qc.invalidateQueries({ queryKey: ['kong'] })
   }, [current?.status, qc])
 
   const apply = useMutation({
     mutationFn: () => api<Job>('POST', '/api/migration/kong/apply', { ...selection, hash: plan.data!.hash }),
     onSuccess: (j) => setJobId(j.id),
-    onError: (e) => setError((e as Error).message),
+    onError: (e) => setError((e).message),
   })
 
   const items = plan.data?.items ?? []
@@ -264,7 +264,7 @@ export function PreviewModal({ selection, opened, onClose }: { selection: Select
         </Group>
       ) : plan.error ? (
         <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
-          {(plan.error as Error).message}
+          {(plan.error).message}
         </Alert>
       ) : (
         <Stack>

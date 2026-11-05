@@ -52,13 +52,13 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
 
   const done = (title: string, message: string) => {
     notifications.show({ color: 'teal', icon: <IconCheck size={18} />, title, message })
-    qc.invalidateQueries({ queryKey })
+    void qc.invalidateQueries({ queryKey })
   }
 
   const remove = useMutation({
     mutationFn: (id: string) => api('DELETE', `${base}/${encodeURIComponent(id)}`),
     onSuccess: () => done('Excluída', 'Credencial excluída'),
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e as Error).message }),
+    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: (e).message }),
   })
 
   const confirmDelete = (id: string) =>
@@ -102,7 +102,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
 
       {error && (
         <Alert color="red" icon={<IconAlertCircle size={16} />}>
-          {(error as Error).message}
+          {(error).message}
         </Alert>
       )}
 

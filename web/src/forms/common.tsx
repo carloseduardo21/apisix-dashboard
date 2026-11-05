@@ -53,7 +53,7 @@ export function OneOrMany({
   placeholder?: string
   required?: boolean
 }) {
-  const list = Array.isArray(value[many]) ? (value[many] as string[]) : typeof value[single] === 'string' ? [value[single] as string] : []
+  const list = Array.isArray(value[many]) ? (value[many] as string[]) : typeof value[single] === 'string' ? [value[single]] : []
   return (
     <TagsInput
       label={rest.label}

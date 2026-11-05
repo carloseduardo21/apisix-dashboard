@@ -183,7 +183,7 @@ export function KongMigration() {
                 </Stack>
               ) : inventory.error ? (
                 <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} title="Não foi possível montar o inventário">
-                  {(inventory.error as Error).message}
+                  {(inventory.error).message}
                 </Alert>
               ) : (
                 <Inventory plan={inventory.data} onPreview={setPreview} />

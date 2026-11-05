@@ -63,7 +63,7 @@ function isEmpty(v: unknown) {
 
 /** Returns a copy of obj with key set, or removed when v is empty. */
 export function setKey(obj: Obj | undefined, key: string, v: unknown): Obj {
-  const out = { ...(obj ?? {}) }
+  const out = { ...obj }
   if (isEmpty(v)) delete out[key]
   else out[key] = v
   return out
