@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
+import i18n from '../i18n'
 
 /** The subset of JSON Schema (draft 4/7) used by APISIX. */
 export interface JSONSchema {
@@ -144,15 +145,15 @@ export function variantLabel(raw: JSONSchema, i: number): string {
   if (v.const !== undefined) return typeof v.const === 'string' ? v.const : JSON.stringify(v.const)
   if (v.required?.length && v.type === 'object') return v.required.join(' + ')
   if (v.description && v.description.length < 40) return v.description
-  const names: Record<string, string> = {
-    string: 'texto',
-    integer: 'número inteiro',
-    number: 'número',
-    boolean: 'sim/não',
-    object: 'objeto',
-    array: 'lista',
-  }
-  return v.type ? (names[v.type] ?? v.type) : `Opção ${i + 1}`
+  const names = {
+    string: i18n.t('schema.type.string'),
+    integer: i18n.t('schema.type.integer'),
+    number: i18n.t('schema.type.number'),
+    boolean: i18n.t('schema.type.boolean'),
+    object: i18n.t('schema.type.object'),
+    array: i18n.t('schema.type.array'),
+  } as Record<string, string>
+  return v.type ? (names[v.type] ?? v.type) : i18n.t('schema.option', { n: i + 1 })
 }
 
 // Field names that hold secrets in any plugin (mirrors the backend rules).

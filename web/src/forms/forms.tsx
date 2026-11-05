@@ -30,6 +30,8 @@ import {
   type FormProps,
 } from './common'
 import { UPSTREAM_HANDLED, UpstreamFields } from './UpstreamForm'
+import { Trans } from 'react-i18next'
+import i18n from '../i18n'
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'CONNECT', 'TRACE', 'PURGE']
 
@@ -42,18 +44,10 @@ function Sections({ initial, children }: { initial: string[]; children: React.Re
   )
 }
 
-function StatusSwitch({
-  value,
-  onChange,
-  label = 'Ativo',
-}: {
-  value: Obj
-  onChange: (v: Obj) => void
-  label?: string
-}) {
+function StatusSwitch({ value, onChange, label }: { value: Obj; onChange: (v: Obj) => void; label?: string }) {
   return (
     <Switch
-      label={label}
+      label={label ?? i18n.t('forms.active')}
       checked={value.status === undefined || value.status === 1}
       onChange={(e) => onChange(setKey(value, 'status', e.currentTarget.checked ? undefined : 0))}
     />
@@ -98,10 +92,10 @@ function Destination({
   }
 
   const options = [
-    { value: 'upstream_id', label: 'Upstream existente' },
-    { value: 'upstream', label: 'Upstream próprio' },
-    ...(allowService ? [{ value: 'service_id', label: 'Service' }] : []),
-    ...(allowNone ? [{ value: 'none', label: 'Nenhum' }] : []),
+    { value: 'upstream_id', label: i18n.t('forms.existing_upstream') },
+    { value: 'upstream', label: i18n.t('forms.own_upstream') },
+    ...(allowService ? [{ value: 'service_id', label: i18n.t('forms.service') }] : []),
+    ...(allowNone ? [{ value: 'none', label: i18n.t('forms.none') }] : []),
   ]
 
   return (
@@ -110,7 +104,7 @@ function Destination({
       {target === 'upstream_id' && (
         <ResourceSelect
           resource="upstreams"
-          label="Upstream"
+          label={i18n.t('forms.upstream')}
           required
           value={value.upstream_id}
           onChange={(v) => onChange(setKey(value, 'upstream_id', v))}
@@ -119,9 +113,9 @@ function Destination({
       {target === 'service_id' && (
         <ResourceSelect
           resource="services"
-          label="Service"
+          label={i18n.t('forms.service')}
           required
-          description="A route herda upstream e plugins do service; plugins da route têm precedência."
+          description={i18n.t('forms.service_inherit')}
           value={value.service_id}
           onChange={(v) => onChange(setKey(value, 'service_id', v))}
         />
@@ -135,7 +129,7 @@ function Destination({
       )}
       {target === 'none' && (
         <Text size="sm" c="dimmed">
-          Sem destino: a requisição precisa ser respondida por um plugin (ex.: redirect, mocking, echo).
+          {i18n.t('forms.no_target')}
         </Text>
       )}
     </Stack>
@@ -147,36 +141,36 @@ function Destination({
 function RouteForm({ value, onChange }: FormProps) {
   return (
     <Sections initial={['general', 'match', 'target', 'plugins']}>
-      <Section value="general" title="Geral">
+      <Section value="general" title={i18n.t('forms.sec_general')}>
         <Stack gap="sm">
           <NameDesc value={value} onChange={onChange} />
           <StatusSwitch value={value} onChange={onChange} />
         </Stack>
       </Section>
-      <Section value="match" title="Correspondência" hint="Quais requisições esta route atende">
+      <Section value="match" title={i18n.t('forms.sec_match')} hint={i18n.t('forms.sec_match_hint')}>
         <Stack gap="sm">
           <OneOrMany
             value={value}
             onChange={onChange}
             single="uri"
             many="uris"
-            label="URIs"
+            label={i18n.t('forms.uris')}
             required
             placeholder="/api/*"
-            description="Use * no final para prefixo. Enter para adicionar."
+            description={i18n.t('forms.uris_hint')}
           />
           <OneOrMany
             value={value}
             onChange={onChange}
             single="host"
             many="hosts"
-            label="Hosts"
-            placeholder="api.exemplo.com.br"
-            description="Vazio = qualquer host. Aceita *.dominio."
+            label={i18n.t('forms.hosts')}
+            placeholder={i18n.t('forms.hosts_placeholder')}
+            description={i18n.t('forms.hosts_hint')}
           />
           <MultiSelect
-            label="Métodos"
-            description="Vazio = todos os métodos"
+            label={i18n.t('forms.methods')}
+            description={i18n.t('forms.methods_hint')}
             data={HTTP_METHODS}
             value={Array.isArray(value.methods) ? value.methods.filter((m): m is string => typeof m === 'string') : []}
             onChange={(m) => onChange(setKey(value, 'methods', m))}
@@ -189,34 +183,34 @@ function RouteForm({ value, onChange }: FormProps) {
               onChange={onChange}
               single="remote_addr"
               many="remote_addrs"
-              label="IPs de origem"
+              label={i18n.t('forms.source_ips')}
               placeholder="10.0.0.0/8"
             />
             <NumberInput
-              label="Prioridade"
-              description="Maior vence quando várias routes casam"
+              label={i18n.t('forms.priority')}
+              description={i18n.t('forms.priority_hint')}
               value={typeof value.priority === 'number' ? value.priority : ''}
               onChange={(v) => onChange(setKey(value, 'priority', typeof v === 'number' ? v : undefined))}
             />
           </SimpleGrid>
         </Stack>
       </Section>
-      <Section value="target" title="Destino">
+      <Section value="target" title={i18n.t('forms.sec_target')}>
         <Destination value={value} onChange={onChange} allowService allowNone />
       </Section>
-      <Section value="plugins" title="Plugins">
+      <Section value="plugins" title={i18n.t('forms.sec_plugins')}>
         <Stack gap="sm">
           <ResourceSelect
             resource="plugin_configs"
-            label="Plugin config"
-            description="Conjunto reutilizável de plugins aplicado junto com os desta route"
+            label={i18n.t('forms.plugin_config')}
+            description={i18n.t('forms.plugin_config_hint')}
             value={value.plugin_config_id}
             onChange={(v) => onChange(setKey(value, 'plugin_config_id', v))}
           />
           <PluginsEditor value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
         </Stack>
       </Section>
-      <Section value="advanced" title="Avançado" hint="Labels, timeouts, websocket, vars e demais campos do schema">
+      <Section value="advanced" title={i18n.t('forms.sec_advanced')} hint={i18n.t('forms.sec_advanced_hint')}>
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
           <AdvancedFields
@@ -254,7 +248,7 @@ function RouteForm({ value, onChange }: FormProps) {
 function ServiceForm({ value, onChange }: FormProps) {
   return (
     <Sections initial={['general', 'target', 'plugins']}>
-      <Section value="general" title="Geral">
+      <Section value="general" title={i18n.t('forms.sec_general')}>
         <Stack gap="sm">
           <NameDesc value={value} onChange={onChange} />
           <OneOrMany
@@ -262,23 +256,23 @@ function ServiceForm({ value, onChange }: FormProps) {
             onChange={onChange}
             single="host"
             many="hosts"
-            label="Hosts"
-            placeholder="api.exemplo.com.br"
+            label={i18n.t('forms.hosts')}
+            placeholder={i18n.t('forms.hosts_placeholder')}
           />
           <Switch
-            label="Habilitar WebSocket"
+            label={i18n.t('forms.enable_websocket')}
             checked={value.enable_websocket === true}
             onChange={(e) => onChange(setKey(value, 'enable_websocket', e.currentTarget.checked || undefined))}
           />
         </Stack>
       </Section>
-      <Section value="target" title="Destino">
+      <Section value="target" title={i18n.t('forms.sec_target')}>
         <Destination value={value} onChange={onChange} allowNone />
       </Section>
-      <Section value="plugins" title="Plugins">
+      <Section value="plugins" title={i18n.t('forms.sec_plugins')}>
         <PluginsEditor value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
       </Section>
-      <Section value="advanced" title="Avançado">
+      <Section value="advanced" title={i18n.t('forms.sec_advanced')}>
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
           <AdvancedFields
@@ -319,30 +313,26 @@ function UpstreamForm({ value, onChange }: FormProps) {
 function ConsumerForm({ value, onChange, isNew }: FormProps) {
   return (
     <Sections initial={['general', 'plugins']}>
-      <Section value="general" title="Geral">
+      <Section value="general" title={i18n.t('forms.sec_general')}>
         <Stack gap="sm">
           <TextInput
-            label="Usuário"
+            label={i18n.t('forms.username')}
             withAsterisk
             disabled={!isNew}
-            description={isNew ? 'Letras, números e _ (não pode ser alterado depois)' : undefined}
+            description={isNew ? i18n.t('forms.username_hint') : undefined}
             {...textProps(value, onChange, 'username')}
           />
-          <Textarea label="Descrição" autosize minRows={1} {...textProps(value, onChange, 'desc')} />
+          <Textarea label={i18n.t('common.description')} autosize minRows={1} {...textProps(value, onChange, 'desc')} />
           <ResourceSelect
             resource="consumer_groups"
-            label="Consumer group"
+            label={i18n.t('forms.consumer_group')}
             value={value.group_id}
             onChange={(v) => onChange(setKey(value, 'group_id', v))}
           />
           <LabelsField value={value} onChange={onChange} />
         </Stack>
       </Section>
-      <Section
-        value="plugins"
-        title="Plugins"
-        hint="Prefira cadastrar a autenticação em Credenciais; aqui ficam os demais plugins do consumer"
-      >
+      <Section value="plugins" title={i18n.t('forms.sec_plugins')} hint={i18n.t('forms.consumer_plugins_hint')}>
         <PluginsEditor consumer value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
       </Section>
     </Sections>
@@ -354,12 +344,17 @@ function ConsumerForm({ value, onChange, isNew }: FormProps) {
 function CredentialForm({ value, onChange }: FormProps) {
   return (
     <Stack>
-      <Textarea label="Descrição" autosize minRows={1} maxRows={4} {...textProps(value, onChange, 'desc')} />
+      <Textarea
+        label={i18n.t('common.description')}
+        autosize
+        minRows={1}
+        maxRows={4}
+        {...textProps(value, onChange, 'desc')}
+      />
       <LabelsField value={value} onChange={onChange} />
-      <Text fw={500}>Autenticação</Text>
+      <Text fw={500}>{i18n.t('forms.authentication')}</Text>
       <Text size="sm" c="dimmed">
-        Somente plugins de autenticação (key-auth, basic-auth, jwt-auth, hmac-auth...). Os segredos são cifrados pelo
-        APISIX e mascarados na dashboard.
+        {i18n.t('forms.auth_only_hint')}
       </Text>
       <PluginsEditor
         consumer
@@ -392,7 +387,7 @@ const PluginConfigForm = (p: FormProps) => <PluginsOnlyForm {...p} withName />
 const GlobalRuleForm = (p: FormProps) => (
   <Stack>
     <Alert color="yellow" icon={<IconInfoCircle size={16} />}>
-      Global rules executam em <b>todas</b> as requisições do gateway.
+      <Trans i18nKey="forms.global_rules_warning" components={{ b: <b /> }} />
     </Alert>
     <PluginsOnlyForm {...p} />
   </Stack>
@@ -404,22 +399,22 @@ function SslForm({ value, onChange }: FormProps) {
   const masked = value.key === '******'
   return (
     <Sections initial={['cert']}>
-      <Section value="cert" title="Certificado">
+      <Section value="cert" title={i18n.t('forms.sec_certificate')}>
         <Stack gap="sm">
           <OneOrMany
             value={value}
             onChange={onChange}
             single="sni"
             many="snis"
-            label="SNIs"
+            label={i18n.t('columns.snis')}
             required
-            placeholder="api.exemplo.com.br"
-            description="Domínios atendidos por este certificado. Aceita *.dominio."
+            placeholder={i18n.t('forms.hosts_placeholder')}
+            description={i18n.t('forms.snis_hint')}
           />
           <Textarea
-            label="Certificado (PEM)"
+            label={i18n.t('forms.cert_pem')}
             withAsterisk
-            description="Inclua a cadeia intermediária após o certificado"
+            description={i18n.t('forms.cert_pem_hint')}
             autosize
             minRows={4}
             maxRows={12}
@@ -428,14 +423,14 @@ function SslForm({ value, onChange }: FormProps) {
           />
           {masked ? (
             <PasswordInput
-              label="Chave privada"
-              description="A chave atual está protegida e não é exibida. Para trocar, cole a nova chave em PEM."
+              label={i18n.t('forms.private_key')}
+              description={i18n.t('forms.private_key_masked')}
               value={str(value.key)}
               onChange={(e) => onChange(setKey(value, 'key', e.currentTarget.value))}
             />
           ) : (
             <Textarea
-              label="Chave privada (PEM)"
+              label={i18n.t('forms.private_key_pem')}
               withAsterisk
               autosize
               minRows={4}
@@ -446,10 +441,10 @@ function SslForm({ value, onChange }: FormProps) {
           )}
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <Select
-              label="Tipo"
+              label={i18n.t('forms.type')}
               data={[
-                { value: 'server', label: 'Servidor (clientes → gateway)' },
-                { value: 'client', label: 'Cliente (gateway → upstream)' },
+                { value: 'server', label: i18n.t('forms.ssl_server') },
+                { value: 'client', label: i18n.t('forms.ssl_client') },
               ]}
               value={str(value.type) || 'server'}
               allowDeselect={false}
@@ -459,7 +454,7 @@ function SslForm({ value, onChange }: FormProps) {
           </SimpleGrid>
         </Stack>
       </Section>
-      <Section value="advanced" title="Avançado" hint="mTLS de clientes, protocolos, certificados adicionais">
+      <Section value="advanced" title={i18n.t('forms.sec_advanced')} hint={i18n.t('forms.ssl_advanced_hint')}>
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
           <AdvancedFields
@@ -479,37 +474,41 @@ function SslForm({ value, onChange }: FormProps) {
 function StreamRouteForm({ value, onChange }: FormProps) {
   return (
     <Sections initial={['match', 'target']}>
-      <Section value="match" title="Correspondência">
+      <Section value="match" title={i18n.t('forms.sec_match')}>
         <Stack gap="sm">
           <NameDesc value={value} onChange={onChange} />
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <NumberInput
-              label="Porta do gateway"
-              description="Deve estar em stream_proxy no config.yaml"
+              label={i18n.t('forms.gateway_port')}
+              description={i18n.t('forms.gateway_port_hint')}
               value={typeof value.server_port === 'number' ? value.server_port : ''}
               onChange={(v) => onChange(setKey(value, 'server_port', typeof v === 'number' ? v : undefined))}
             />
             <TextInput
-              label="Endereço do gateway"
+              label={i18n.t('forms.gateway_addr')}
               placeholder="0.0.0.0"
               {...textProps(value, onChange, 'server_addr')}
             />
-            <TextInput label="IP de origem" placeholder="10.0.0.0/8" {...textProps(value, onChange, 'remote_addr')} />
-            <TextInput label="SNI" description="Para tráfego TLS" {...textProps(value, onChange, 'sni')} />
+            <TextInput
+              label={i18n.t('forms.source_ip')}
+              placeholder="10.0.0.0/8"
+              {...textProps(value, onChange, 'remote_addr')}
+            />
+            <TextInput label="SNI" description={i18n.t('forms.sni_hint')} {...textProps(value, onChange, 'sni')} />
           </SimpleGrid>
         </Stack>
       </Section>
-      <Section value="target" title="Destino">
+      <Section value="target" title={i18n.t('forms.sec_target')}>
         <Destination value={value} onChange={onChange} />
       </Section>
-      <Section value="plugins" title="Plugins">
+      <Section value="plugins" title={i18n.t('forms.sec_plugins')}>
         <PluginsEditor
           subsystem="stream"
           value={asObj(value.plugins)}
           onChange={(p) => onChange(setKey(value, 'plugins', p))}
         />
       </Section>
-      <Section value="advanced" title="Avançado">
+      <Section value="advanced" title={i18n.t('forms.sec_advanced')}>
         <Stack gap="sm">
           <LabelsField value={value} onChange={onChange} />
           <AdvancedFields
@@ -543,7 +542,7 @@ function ProtoForm({ value, onChange }: FormProps) {
     <Stack>
       <NameDesc value={value} onChange={onChange} />
       <Textarea
-        label="Conteúdo (.proto)"
+        label={i18n.t('forms.proto_content')}
         withAsterisk
         autosize
         minRows={10}
@@ -562,27 +561,31 @@ function SecretForm({ value, onChange }: FormProps) {
   return (
     <Stack>
       <Alert color="blue" icon={<IconInfoCircle size={16} />}>
-        Para HashiCorp Vault use o ID no formato <code>vault/1</code>. Outros gerenciadores (aws, gcp) podem ser
-        editados pela aba JSON. Referencie segredos nos plugins com <code>$secret://vault/1/caminho/chave</code>.
+        <Trans i18nKey="forms.vault_hint" components={{ code: <code /> }} />
       </Alert>
       <TextInput
-        label="URI do Vault"
+        label={i18n.t('forms.vault_uri')}
         withAsterisk
-        placeholder="https://vault.interno:8200"
+        placeholder="https://vault.internal:8200"
         {...textProps(value, onChange, 'uri')}
       />
-      <TextInput label="Prefixo" withAsterisk placeholder="kv/apisix" {...textProps(value, onChange, 'prefix')} />
-      <PasswordInput
-        label="Token"
+      <TextInput
+        label={i18n.t('forms.prefix')}
         withAsterisk
-        description={
-          value.token === '******'
-            ? 'Token atual mascarado. Mantenha para preservar ou digite um novo.'
-            : 'Prefira um token com política somente leitura'
-        }
+        placeholder="kv/apisix"
+        {...textProps(value, onChange, 'prefix')}
+      />
+      <PasswordInput
+        label={i18n.t('forms.token')}
+        withAsterisk
+        description={value.token === '******' ? i18n.t('forms.token_masked') : i18n.t('forms.token_hint')}
         {...textProps(value, onChange, 'token')}
       />
-      <TextInput label="Namespace" description="Vault Enterprise" {...textProps(value, onChange, 'namespace')} />
+      <TextInput
+        label={i18n.t('forms.namespace')}
+        description="Vault Enterprise"
+        {...textProps(value, onChange, 'namespace')}
+      />
     </Stack>
   )
 }

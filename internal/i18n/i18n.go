@@ -6,7 +6,7 @@
 // in logs, audit details and the CLI, and as the UI fallback.
 //
 // Codes are part of the API contract: rename them only together with the
-// frontend catalogs (checked by `npm run i18n:check`).
+// frontend catalogs (checked by `go test ./internal/i18n`).
 package i18n
 
 import (

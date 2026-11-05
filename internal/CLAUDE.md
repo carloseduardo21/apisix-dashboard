@@ -11,8 +11,12 @@ Read `.claude/CLAUDE.md` first; these rules add to it.
 - Wrap errors with context: `fmt.Errorf("load certificate %d: %w", id, err)`; compare
   with `errors.Is/As`. Do not ignore errors silently; if ignoring is intentional, write
   `_ =` and a comment.
-- Code comments and log messages in English. User-facing strings returned by the API
-  are PT-BR today and will move to i18n keys — keep them in one place per handler.
+- Code comments, logs, audit details and CLI output in English.
+- User-facing API messages are **codes + params** (`internal/i18n`): use
+  `writeError(w, status, code, englishTemplate, kv...)`, `validationErr(...)` or
+  `i18n.E(...)` for user-safe errors; add `server.<code>` to the three UI catalogs
+  (`go test ./internal/i18n` checks it). Error responses are
+  `{"error": English, "code", "params", "details"}`.
 
 ## HTTP layer (`internal/server`)
 - stdlib `http.ServeMux` with method patterns (`"POST /api/x/{id}"`). No frameworks.

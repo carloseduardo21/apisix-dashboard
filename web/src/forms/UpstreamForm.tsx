@@ -17,6 +17,8 @@ import { ObjectFields, SchemaField } from '../schema/SchemaForm'
 import { isObj, setKey, useCatalog, type Obj } from '../schema/types'
 import { LabelsField, NameDesc, str, textProps } from './common'
 import { text } from '../values'
+import type { ParseKeys } from 'i18next'
+import { useTranslation } from 'react-i18next'
 
 interface Node {
   host: string
@@ -51,28 +53,25 @@ function toNodes(v: unknown): Node[] {
 }
 
 function NodesEditor({ value, onChange }: { value: unknown; onChange: (v: Node[]) => void }) {
+  const { t } = useTranslation()
   const nodes = toNodes(value)
   const set = (i: number, patch: Partial<Node>) => onChange(nodes.map((n, j) => (j === i ? { ...n, ...patch } : n)))
   return (
-    <Input.Wrapper
-      label="Nós"
-      withAsterisk
-      description="Destinos do balanceamento. Em Swarm, use o nome do serviço (resolvido pelo DNS interno)."
-    >
+    <Input.Wrapper label={t('upstream.nodes')} withAsterisk description={t('upstream.nodes_hint')}>
       <Stack gap={6} mt={4}>
         {nodes.length > 0 && (
           <Group gap="xs" wrap="nowrap">
             <Text size="xs" c="dimmed" style={{ flex: 3 }}>
-              Host
+              {t('upstream.host')}
             </Text>
             <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-              Porta
+              {t('upstream.port')}
             </Text>
             <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-              Peso
+              {t('upstream.weight')}
             </Text>
             <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-              Prioridade
+              {t('upstream.priority')}
             </Text>
             <div style={{ width: 28 }} />
           </Group>
@@ -83,7 +82,7 @@ function NodesEditor({ value, onChange }: { value: unknown; onChange: (v: Node[]
             <TextInput
               style={{ flex: 3 }}
               value={n.host ?? ''}
-              placeholder="servico"
+              placeholder={t('upstream.host_placeholder')}
               onChange={(e) => set(i, { host: e.currentTarget.value })}
             />
             <NumberInput
@@ -117,27 +116,28 @@ function NodesEditor({ value, onChange }: { value: unknown; onChange: (v: Node[]
           w="fit-content"
           onClick={() => onChange([...nodes, { host: '', port: 80, weight: 1 }])}
         >
-          Adicionar nó
+          {t('upstream.add_node')}
         </Button>
       </Stack>
     </Input.Wrapper>
   )
 }
 
+// Labels are translation keys.
 const LB_TYPES = [
-  { value: 'roundrobin', label: 'Round robin (ponderado)' },
-  { value: 'chash', label: 'Hash consistente' },
-  { value: 'least_conn', label: 'Menos conexões' },
-  { value: 'ewma', label: 'Menor latência (EWMA)' },
-]
+  { value: 'roundrobin', label: 'upstream.lb_roundrobin' },
+  { value: 'chash', label: 'upstream.lb_chash' },
+  { value: 'least_conn', label: 'upstream.lb_least_conn' },
+  { value: 'ewma', label: 'upstream.lb_ewma' },
+] as const
 
-// [fields, title, accordion id, hint]
-const OPTIONAL_GROUPS: [string[], string, string, string][] = [
-  [['timeout'], 'Timeouts', 'timeout', 'connect, send e read em segundos (se definir, informe os três)'],
-  [['retries', 'retry_timeout'], 'Retentativas', 'retries', 'Quantas vezes tentar outro nó em caso de falha'],
-  [['checks'], 'Health checks', 'checks', 'Verificações ativas e passivas dos nós'],
-  [['tls'], 'TLS com o upstream', 'tls', 'Certificado de cliente (mTLS) e verificação do servidor'],
-  [['keepalive_pool'], 'Pool de keepalive', 'keepalive', 'Conexões reutilizadas com os nós'],
+// [fields, title key, accordion id, hint key]
+const OPTIONAL_GROUPS: [string[], ParseKeys, string, ParseKeys][] = [
+  [['timeout'], 'upstream.grp_timeout', 'timeout', 'upstream.grp_timeout_hint'],
+  [['retries', 'retry_timeout'], 'upstream.grp_retries', 'retries', 'upstream.grp_retries_hint'],
+  [['checks'], 'upstream.grp_checks', 'checks', 'upstream.grp_checks_hint'],
+  [['tls'], 'upstream.grp_tls', 'tls', 'upstream.grp_tls_hint'],
+  [['keepalive_pool'], 'upstream.grp_keepalive', 'keepalive', 'upstream.grp_keepalive_hint'],
 ]
 
 const SCHEMES = ['http', 'https', 'grpc', 'grpcs', 'ws', 'wss', 'tcp', 'tls', 'udp', 'kafka']
@@ -155,6 +155,7 @@ export function UpstreamFields({
   onChange: (v: Obj) => void
   embedded?: boolean
 }) {
+  const { t } = useTranslation()
   const catalog = useCatalog()
   const props = catalog.data?.resources.upstream?.properties ?? {}
   const discovery = value.service_name !== undefined || value.discovery_type !== undefined
@@ -176,8 +177,8 @@ export function UpstreamFields({
 
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <Select
-          label="Balanceamento"
-          data={LB_TYPES}
+          label={t('upstream.balancing')}
+          data={LB_TYPES.map((o) => ({ value: o.value, label: t(o.label) }))}
           value={type}
           allowDeselect={false}
           onChange={(v) =>
@@ -185,7 +186,7 @@ export function UpstreamFields({
           }
         />
         <Select
-          label="Protocolo"
+          label={t('upstream.protocol')}
           data={SCHEMES}
           value={str(value.scheme) || 'http'}
           allowDeselect={false}
@@ -195,11 +196,11 @@ export function UpstreamFields({
 
       {type === 'chash' && (
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          {sub('hash_on', 'Hash com base em')}
+          {sub('hash_on', t('upstream.hash_on'))}
           <TextInput
-            label="Chave do hash"
+            label={t('upstream.hash_key')}
             withAsterisk
-            description="Ex.: remote_addr, uri, nome do header/cookie"
+            description={t('upstream.hash_key_hint')}
             {...textProps(value, onChange, 'key')}
           />
         </SimpleGrid>
@@ -223,23 +224,23 @@ export function UpstreamFields({
           )
         }
         data={[
-          { value: 'nodes', label: 'Nós fixos' },
-          { value: 'discovery', label: 'Service discovery' },
+          { value: 'nodes', label: t('upstream.fixed_nodes') },
+          { value: 'discovery', label: t('upstream.discovery') },
         ]}
         w="fit-content"
       />
       {discovery ? (
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
           <TextInput
-            label="Tipo de discovery"
+            label={t('upstream.discovery_type')}
             withAsterisk
             description="dns, consul, nacos, eureka, kubernetes..."
             {...textProps(value, onChange, 'discovery_type')}
           />
           <TextInput
-            label="Nome do serviço"
+            label={t('upstream.service_name')}
             withAsterisk
-            description="Para DNS: host:porta"
+            description={t('upstream.service_name_hint')}
             {...textProps(value, onChange, 'service_name')}
           />
         </SimpleGrid>
@@ -248,9 +249,13 @@ export function UpstreamFields({
       )}
 
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
-        {sub('pass_host', 'Header Host enviado')}
+        {sub('pass_host', t('upstream.pass_host'))}
         {value.pass_host === 'rewrite' && (
-          <TextInput label="Host reescrito" withAsterisk {...textProps(value, onChange, 'upstream_host')} />
+          <TextInput
+            label={t('upstream.upstream_host')}
+            withAsterisk
+            {...textProps(value, onChange, 'upstream_host')}
+          />
         )}
       </SimpleGrid>
       {/* Optional groups stay collapsed; once a group is set APISIX requires its fields. */}
@@ -266,16 +271,16 @@ export function UpstreamFields({
             <Accordion.Control>
               <Group gap="xs">
                 <Text size="sm" fw={500}>
-                  {title}
+                  {t(title)}
                 </Text>
                 {keys.some((k) => value[k] !== undefined) && (
                   <Text size="xs" c="teal">
-                    configurado
+                    {t('upstream.configured')}
                   </Text>
                 )}
               </Group>
               <Text size="xs" c="dimmed">
-                {hint}
+                {t(hint)}
               </Text>
             </Accordion.Control>
             <Accordion.Panel>
@@ -287,13 +292,13 @@ export function UpstreamFields({
                       value={value[keys[0]]}
                       path={keys[0]}
                       onChange={(v) => onChange(setKey(value, keys[0], v))}
-                      moreLabel="Opções"
+                      moreLabel={t('schema.options')}
                     />
                   )
                 ) : (
                   <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                    {sub('retries', 'Tentativas')}
-                    {sub('retry_timeout', 'Tempo máximo de retentativas (s)')}
+                    {sub('retries', t('upstream.retries'))}
+                    {sub('retry_timeout', t('upstream.retry_timeout'))}
                   </SimpleGrid>
                 )}
               </Stack>

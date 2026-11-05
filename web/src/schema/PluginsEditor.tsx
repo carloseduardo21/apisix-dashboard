@@ -17,10 +17,13 @@ import {
 import { IconAlertCircle, IconExternalLink, IconPlug, IconTrash } from '@tabler/icons-react'
 import { JsonField, ObjectFields } from './SchemaForm'
 import { isObj, sensitiveMatcher, setKey, useCatalog, type JSONSchema, type Obj, type PluginInfo } from './types'
+import type { ParseKeys } from 'i18next'
+import { useTranslation } from 'react-i18next'
 
-const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
+/** Plugin groups in the add menu: [translation key, test]. */
+const CATEGORIES: [ParseKeys, (name: string, info: PluginInfo) => boolean][] = [
   [
-    'Autenticação',
+    'schema.cat.auth',
     (n, i) =>
       i.type === 'auth' ||
       n.endsWith('-auth') ||
@@ -29,7 +32,7 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
       ),
   ],
   [
-    'Segurança',
+    'schema.cat.security',
     (n) =>
       [
         'cors',
@@ -43,7 +46,7 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
       ].includes(n) || n.endsWith('-restriction'),
   ],
   [
-    'Tráfego',
+    'schema.cat.traffic',
     (n) =>
       n.startsWith('limit-') ||
       n.startsWith('traffic-') ||
@@ -61,7 +64,7 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
       ].includes(n),
   ],
   [
-    'Transformação',
+    'schema.cat.transform',
     (n) =>
       n.includes('rewrite') ||
       n.includes('transform') ||
@@ -79,7 +82,7 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
       ].includes(n),
   ],
   [
-    'Observabilidade',
+    'schema.cat.observability',
     (n) =>
       n.endsWith('-logger') ||
       n.endsWith('-logging') ||
@@ -95,9 +98,9 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
         'lago',
       ].includes(n),
   ],
-  ['IA', (n) => n.startsWith('ai')],
+  ['schema.cat.ai', (n) => n.startsWith('ai')],
   [
-    'Serverless',
+    'schema.cat.serverless',
     (n) =>
       n.startsWith('serverless') ||
       n.startsWith('ext-plugin') ||
@@ -106,8 +109,8 @@ const CATEGORIES: [string, (name: string, info: PluginInfo) => boolean][] = [
   ],
 ]
 
-function category(name: string, info: PluginInfo) {
-  return CATEGORIES.find(([, test]) => test(name, info))?.[0] ?? 'Outros'
+function category(name: string, info: PluginInfo): ParseKeys {
+  return CATEGORIES.find(([, test]) => test(name, info))?.[0] ?? 'schema.cat.other'
 }
 
 interface Props {
@@ -123,6 +126,7 @@ interface Props {
 const NO_PLUGINS: Obj = {}
 
 export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem = 'http' }: Props) {
+  const { t } = useTranslation()
   const catalog = useCatalog()
   const plugins = isObj(value) ? value : NO_PLUGINS
   const enabled = Object.keys(plugins)
@@ -131,20 +135,25 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
   const [search, setSearch] = useState('')
 
   const available = subsystem === 'stream' ? catalog.data?.stream_plugins : catalog.data?.plugins
-  const options = useMemo(() => {
-    const groups: Record<string, { value: string; label: string }[]> = {}
+  // Grouped by category key; labels are translated at render time.
+  const grouped = useMemo(() => {
+    const groups: Partial<Record<ParseKeys, { value: string; label: string }[]>> = {}
     for (const [name, info] of Object.entries(available ?? {}).toSorted(([a], [b]) => a.localeCompare(b))) {
       if (name in plugins || (authOnly && info.type !== 'auth')) continue
       ;(groups[category(name, info)] ??= []).push({ value: name, label: name })
     }
-    return Object.entries(groups).map(([group, items]) => ({ group, items }))
+    return groups
   }, [available, plugins, authOnly])
+  const options = CATEGORIES.map(([key]) => key)
+    .concat('schema.cat.other')
+    .filter((key) => grouped[key])
+    .map((key) => ({ group: t(key), items: grouped[key] ?? [] }))
 
   if (catalog.isPending) return <Loader size="sm" />
   if (catalog.error) {
     return (
       <Alert color="red" icon={<IconAlertCircle size={16} />}>
-        Não foi possível carregar os schemas de plugins: {catalog.error.message}
+        {t('schema.plugins_load_error', { error: catalog.error.message })}
       </Alert>
     )
   }
@@ -167,10 +176,10 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
     <Stack gap="sm">
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
-          {enabled.length ? `${enabled.length} plugin(s) configurado(s)` : 'Nenhum plugin configurado'}
+          {enabled.length ? t('schema.plugins_count', { count: enabled.length }) : t('schema.no_plugins')}
         </Text>
         <Select
-          placeholder="Adicionar plugin..."
+          placeholder={t('schema.add_plugin')}
           leftSection={<IconPlug size={16} />}
           data={options}
           value={null}
@@ -178,7 +187,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
           searchValue={search}
           onSearchChange={setSearch}
           searchable
-          nothingFoundMessage="Nenhum plugin encontrado"
+          nothingFoundMessage={t('schema.no_plugin_found')}
           w={300}
           maxDropdownHeight={360}
           comboboxProps={{ withinPortal: true }}
@@ -225,7 +234,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                       <Group gap="md">
                         <Switch
                           size="xs"
-                          label="Ativo"
+                          label={t('schema.plugin_active')}
                           checked={!disabled}
                           onChange={(e) => {
                             const nextMeta = setKey(meta, 'disable', e.currentTarget.checked ? undefined : true)
@@ -237,7 +246,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                           value={mode}
                           onChange={(m) => setModes((s) => ({ ...s, [name]: m }))}
                           data={[
-                            { value: 'form', label: 'Formulário', disabled: !schema },
+                            { value: 'form', label: t('editor.form_tab'), disabled: !schema },
                             { value: 'json', label: 'JSON' },
                           ]}
                         />
@@ -250,10 +259,10 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                           size="xs"
                         >
                           <Group gap={2}>
-                            documentação <IconExternalLink size={12} />
+                            {t('schema.docs')} <IconExternalLink size={12} />
                           </Group>
                         </Anchor>
-                        <Tooltip label="Remover plugin">
+                        <Tooltip label={t('schema.remove_plugin')}>
                           <ActionIcon variant="subtle" color="red" onClick={() => update(name, undefined)}>
                             <IconTrash size={16} />
                           </ActionIcon>
@@ -267,7 +276,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
                         onChange={(v) => update(name, v)}
                         path=""
                         sensitive={sensitive}
-                        moreLabel="Opções"
+                        moreLabel={t('schema.options')}
                       />
                     ) : (
                       <JsonField

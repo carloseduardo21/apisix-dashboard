@@ -73,13 +73,13 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     credentials: 'same-origin',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  const text = await res.text()
+  const raw = await res.text()
   let data: unknown
-  if (text) {
+  if (raw) {
     try {
-      data = JSON.parse(text)
+      data = JSON.parse(raw)
     } catch {
-      data = text
+      data = raw
     }
   }
   if (!res.ok) {

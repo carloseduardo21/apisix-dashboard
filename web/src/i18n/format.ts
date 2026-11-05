@@ -9,8 +9,9 @@ export interface ServerMessage {
 }
 
 // Backend codes live under "server." in the catalogs. They are data, so the
-// key is not known at compile time; i18n:check guarantees every code the Go
+// key is not known at compile time; go test ./internal/i18n guarantees every code the Go
 // code emits exists in the catalogs.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- dynamic keys are validated by go test ./internal/i18n
 const translateDynamic = i18n.t.bind(i18n) as unknown as (key: string, options?: Record<string, unknown>) => string
 
 /** Translates a backend message, falling back to its English text. */
