@@ -32,10 +32,10 @@ import (
 
 	"golang.org/x/crypto/acme"
 
-	"apisix-dashboard/internal/apisix"
-	"apisix-dashboard/internal/audit"
-	"apisix-dashboard/internal/secure"
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
+	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/secure"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 const (

@@ -18,16 +18,16 @@ import (
 	"syscall"
 	"time"
 
-	"apisix-dashboard/internal/acme"
-	"apisix-dashboard/internal/apisix"
-	"apisix-dashboard/internal/audit"
-	"apisix-dashboard/internal/auth"
-	"apisix-dashboard/internal/config"
-	"apisix-dashboard/internal/kong"
-	"apisix-dashboard/internal/secure"
-	"apisix-dashboard/internal/server"
-	"apisix-dashboard/internal/store"
-	"apisix-dashboard/internal/web"
+	"github.com/carloseduardo21/apisix-dashboard/internal/acme"
+	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
+	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/auth"
+	"github.com/carloseduardo21/apisix-dashboard/internal/config"
+	"github.com/carloseduardo21/apisix-dashboard/internal/kong"
+	"github.com/carloseduardo21/apisix-dashboard/internal/secure"
+	"github.com/carloseduardo21/apisix-dashboard/internal/server"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/web"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".

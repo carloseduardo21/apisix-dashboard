@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 func TestNormalizeDomains(t *testing.T) {

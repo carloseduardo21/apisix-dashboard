@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"apisix-dashboard/internal/apisix"
-	"apisix-dashboard/internal/audit"
-	"apisix-dashboard/internal/auth"
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
+	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/auth"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 // Query parameters forwarded to the Admin API on list requests.

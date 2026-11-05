@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"apisix-dashboard/internal/kong"
+	"github.com/carloseduardo21/apisix-dashboard/internal/kong"
 )
 
 func (p *principal) kongActor() kong.Actor { return kong.Actor{Name: p.user.Username, IP: p.meta.IP} }

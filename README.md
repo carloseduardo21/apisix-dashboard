@@ -12,7 +12,7 @@ navegador ──HTTPS──▶ apisix-dashboard ──X-API-KEY──▶ APISIX 
 ## Início rápido
 
 ```bash
-make build                      # requer Node 24+ e Go 1.26+
+make build                      # requer Node 24+ e Go 1.27+
 export DASH_ADMIN_API_URL=http://127.0.0.1:9180
 export DASH_ADMIN_API_KEY=sua-admin-key
 ./bin/apisix-dashboard user add -u admin -r admin    # pede a senha

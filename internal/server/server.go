@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"apisix-dashboard/internal/acme"
-	"apisix-dashboard/internal/apisix"
-	"apisix-dashboard/internal/audit"
-	"apisix-dashboard/internal/auth"
-	"apisix-dashboard/internal/kong"
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/acme"
+	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
+	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/auth"
+	"github.com/carloseduardo21/apisix-dashboard/internal/kong"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 const (

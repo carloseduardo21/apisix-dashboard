@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"apisix-dashboard/internal/acme"
-	"apisix-dashboard/internal/audit"
-	"apisix-dashboard/internal/store"
+	"github.com/carloseduardo21/apisix-dashboard/internal/acme"
+	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 type certView struct {
