@@ -32,27 +32,27 @@ import { Inventory } from './kong/Inventory'
 import { PreviewModal } from './kong/PreviewModal'
 import { SettingsForm } from './kong/SettingsForm'
 import { KIND_LABEL, type KongInfo, type MigrationRecord, type Plan, type Selection } from './kong/types'
+import { Trans, useTranslation } from 'react-i18next'
+import { formatDateTime, serverText } from '../i18n/format'
 
 function SetupHelp() {
+  const { t } = useTranslation()
   return (
     <Card>
-      <EmptyState
-        icon={IconTransfer}
-        title="Migração do Kong desativada"
-        description="A dashboard lê o Kong pela Admin API (só leitura), traduz services, rotas, upstreams, plugins e consumers e grava no APISIX por etapas. Para ativar, configure o serviço:"
-      />
+      <EmptyState icon={IconTransfer} title={t('kong.setup_title')} description={t('kong.setup_desc')} />
       <Code block mx="auto" maw={640}>
         {`DASH_KONG_ADMIN_URL=http://kong-admin:8001
-DASH_KONG_ADMIN_TOKEN_FILE=/run/secrets/kong_admin_token   # se a Admin API exigir token`}
+DASH_KONG_ADMIN_TOKEN_FILE=/run/secrets/kong_admin_token   # ${t('kong.setup_token_comment')}`}
       </Code>
       <Text size="xs" c="dimmed" ta="center" mt="sm" mb="md">
-        Use um acesso somente leitura à Admin API do Kong, numa rede interna.
+        {t('kong.setup_hint')}
       </Text>
     </Card>
   )
 }
 
 function History() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const q = useQuery({
     queryKey: ['kong', 'history'],
@@ -68,17 +68,13 @@ function History() {
   if (!q.data?.length)
     return (
       <Card>
-        <EmptyState
-          icon={IconHistory}
-          title="Nada migrado ainda"
-          description="Cada objeto gravado no APISIX pela migração aparece aqui."
-        />
+        <EmptyState icon={IconHistory} title={t('kong.history_empty')} description={t('kong.history_empty_desc')} />
       </Card>
     )
   return (
     <Card>
       <TextInput
-        placeholder="Buscar"
+        placeholder={t('common.search')}
         leftSection={<IconSearch size={16} />}
         value={query}
         onChange={(e) => setQuery(e.currentTarget.value)}
@@ -89,20 +85,20 @@ function History() {
         <Table verticalSpacing={6} fz="sm" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Quando</Table.Th>
-              <Table.Th>Tipo</Table.Th>
-              <Table.Th>No Kong</Table.Th>
-              <Table.Th>No APISIX</Table.Th>
-              <Table.Th>Por</Table.Th>
+              <Table.Th>{t('kong.col_when')}</Table.Th>
+              <Table.Th>{t('kong.col_kind')}</Table.Th>
+              <Table.Th>{t('kong.col_in_kong')}</Table.Th>
+              <Table.Th>{t('kong.col_in_apisix')}</Table.Th>
+              <Table.Th>{t('kong.col_by')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {rows.map((r) => (
               <Table.Tr key={r.kind + r.kong_id}>
-                <Table.Td>{new Date(r.migrated_at).toLocaleString('pt-BR')}</Table.Td>
+                <Table.Td>{formatDateTime(r.migrated_at)}</Table.Td>
                 <Table.Td>
                   <Badge size="xs" variant="outline" color="gray">
-                    {KIND_LABEL[r.kind]}
+                    {t(KIND_LABEL[r.kind])}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
@@ -126,6 +122,7 @@ function History() {
 }
 
 export function KongMigration() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [tab, setTab] = useState<string | null>('inventory')
   const [preview, setPreview] = useState<Selection | null>(null)
@@ -159,8 +156,8 @@ export function KongMigration() {
     <>
       <PageHeader
         icon={IconTransfer}
-        title="Migração do Kong"
-        description="Traga a configuração do Kong para o APISIX por etapas: escolha, revise e aplique."
+        title={t('kong.title')}
+        description={t('kong.description')}
         badge={
           k?.info && (
             <Tooltip label={k.url}>
@@ -178,7 +175,7 @@ export function KongMigration() {
               loading={inventory.isFetching}
               onClick={() => qc.invalidateQueries({ queryKey: ['kong'] })}
             >
-              Recarregar do Kong
+              {t('kong.reload')}
             </Button>
           )
         }
@@ -191,7 +188,7 @@ export function KongMigration() {
         <Stack>
           {k.error && (
             <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
-              {k.error}
+              {serverText({ code: k.code, params: k.params, message: k.error })}
             </Alert>
           )}
           {untranslated.length > 0 && (
@@ -199,7 +196,7 @@ export function KongMigration() {
               color="orange"
               variant="light"
               icon={<IconAlertCircle size={16} />}
-              title="Plugins sem tradução automática"
+              title={t('kong.untranslated_title')}
             >
               <Text size="sm">
                 {untranslated.map((p, i) => (
@@ -208,24 +205,24 @@ export function KongMigration() {
                     <Code>{p}</Code>
                   </span>
                 ))}
-                . Os objetos que os usam ficam bloqueados. Crie uma regra em{' '}
-                <Anchor component="button" size="sm" onClick={() => setTab('settings')}>
-                  Padrões
-                </Anchor>{' '}
-                para mapear ou ignorar cada um.
+                .{' '}
+                <Trans
+                  i18nKey="kong.untranslated_hint"
+                  components={{ link: <Anchor component="button" size="sm" onClick={() => setTab('settings')} /> }}
+                />
               </Text>
             </Alert>
           )}
           <Tabs value={tab} onChange={setTab} keepMounted={false}>
             <Tabs.List mb="md">
               <Tabs.Tab value="inventory" leftSection={<IconListCheck size={16} />}>
-                Inventário
+                {t('kong.tab_inventory')}
               </Tabs.Tab>
               <Tabs.Tab value="settings" leftSection={<IconAdjustments size={16} />}>
-                Padrões
+                {t('kong.tab_settings')}
               </Tabs.Tab>
               <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
-                Histórico
+                {t('kong.tab_history')}
               </Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="inventory">
@@ -239,7 +236,7 @@ export function KongMigration() {
                   color="red"
                   variant="light"
                   icon={<IconAlertCircle size={16} />}
-                  title="Não foi possível montar o inventário"
+                  title={t('kong.inventory_error')}
                 >
                   {inventory.error.message}
                 </Alert>

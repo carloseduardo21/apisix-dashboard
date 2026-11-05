@@ -9,14 +9,12 @@ import type { Obj } from '../schema/types'
 import type { ResourceDef } from '../resources'
 import { ResourceEditor } from './ResourceEditor'
 import { asObj } from '../values'
+import { Trans, useTranslation } from 'react-i18next'
+import { formatDateTime } from '../i18n/format'
 
 // Credentials live under the consumer: /consumers/{username}/credentials/{id}.
 const CREDENTIAL_DEF: ResourceDef = {
   key: 'credentials',
-  label: 'Credenciais',
-  singular: 'credencial',
-  feminine: true,
-  description: 'Chave, usuário/senha ou segredo usado pelo consumer para se autenticar',
   icon: IconKey,
   columns: [],
   create: 'put-id',
@@ -34,12 +32,13 @@ function editable(value: Obj) {
 
 const credentialId = (item: AdminItem) => item.key.split('/').pop() ?? ''
 
-const fmtTime = (v: unknown) => (typeof v === 'number' ? new Date(v * 1000).toLocaleString('pt-BR') : '—')
+const fmtTime = (v: unknown) => (typeof v === 'number' ? formatDateTime(v * 1000) : '—')
 
 /** APISIX before 3.10 has no credentials endpoint. */
 const unsupported = (e: unknown) => e instanceof ApiError && e.status === 404
 
 export function ConsumerCredentials({ username, writable }: { username: string; writable: boolean }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const base = `/api/apisix/consumers/${encodeURIComponent(username)}/credentials`
   const queryKey = ['apisix', 'consumers', username, 'credentials']
@@ -58,20 +57,19 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
 
   const remove = useMutation({
     mutationFn: (id: string) => api('DELETE', `${base}/${encodeURIComponent(id)}`),
-    onSuccess: () => done('Excluída', 'Credencial excluída'),
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: e.message }),
+    onSuccess: () => done(t('credentials.deleted_title'), t('credentials.deleted')),
+    onError: (e) => notifications.show({ color: 'red', title: t('page.delete_failed'), message: e.message }),
   })
 
   const confirmDelete = (id: string) =>
     modals.openConfirmModal({
-      title: <Text fw={600}>Excluir credencial</Text>,
+      title: <Text fw={600}>{t('credentials.delete_title')}</Text>,
       children: (
         <Text size="sm">
-          Excluir <Code>{id}</Code> de <Code>{username}</Code>? Clientes que usam essa credencial deixam de se
-          autenticar imediatamente.
+          <Trans i18nKey="credentials.delete_confirm" values={{ id, username }} components={{ code: <Code /> }} />
         </Text>
       ),
-      labels: { confirm: 'Excluir', cancel: 'Cancelar' },
+      labels: { confirm: t('common.delete'), cancel: t('common.cancel') },
       confirmProps: { color: 'red', leftSection: <IconTrash size={16} /> },
       onConfirm: () => remove.mutate(id),
     })
@@ -79,8 +77,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
   if (unsupported(error)) {
     return (
       <Alert color="gray" icon={<IconAlertCircle size={16} />}>
-        Este APISIX não suporta credenciais (disponível a partir da versão 3.10). Configure a autenticação nos plugins
-        do consumer.
+        {t('credentials.unsupported')}
       </Alert>
     )
   }
@@ -91,15 +88,14 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
     <Stack gap="sm">
       <Group justify="space-between">
         <div>
-          <Text fw={600}>Credenciais</Text>
+          <Text fw={600}>{t('credentials.title')}</Text>
           <Text size="xs" c="dimmed">
-            Um consumer pode ter várias credenciais, por exemplo uma por aplicação, para trocar uma sem derrubar as
-            outras.
+            {t('credentials.help')}
           </Text>
         </div>
         {writable && (
           <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setEditing({ mode: 'create' })}>
-            Nova credencial
+            {t('credentials.new')}
           </Button>
         )}
       </Group>
@@ -115,7 +111,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
       ) : list.length === 0 ? (
         !error && (
           <Text size="sm" c="dimmed" ta="center" py="md">
-            Nenhuma credencial cadastrada
+            {t('credentials.empty')}
           </Text>
         )
       ) : (
@@ -124,9 +120,9 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>ID</Table.Th>
-                <Table.Th>Autenticação</Table.Th>
-                <Table.Th>Descrição</Table.Th>
-                <Table.Th>Atualizada</Table.Th>
+                <Table.Th>{t('credentials.col_auth')}</Table.Th>
+                <Table.Th>{t('common.description')}</Table.Th>
+                <Table.Th>{t('credentials.col_updated')}</Table.Th>
                 {writable && <Table.Th w={72} />}
               </Table.Tr>
             </Table.Thead>
@@ -169,21 +165,21 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
                     {writable && (
                       <Table.Td>
                         <Group gap={2} wrap="nowrap">
-                          <Tooltip label="Editar">
+                          <Tooltip label={t('common.edit')}>
                             <ActionIcon
                               variant="subtle"
                               color="gray"
-                              aria-label={`Editar ${id}`}
+                              aria-label={t('credentials.edit_aria', { id })}
                               onClick={() => setEditing({ mode: 'edit', id, value: editable(item.value) })}
                             >
                               <IconEdit size={16} />
                             </ActionIcon>
                           </Tooltip>
-                          <Tooltip label="Excluir">
+                          <Tooltip label={t('common.delete')}>
                             <ActionIcon
                               variant="subtle"
                               color="red"
-                              aria-label={`Excluir ${id}`}
+                              aria-label={t('credentials.delete_aria', { id })}
                               onClick={() => confirmDelete(id)}
                             >
                               <IconTrash size={16} />
@@ -206,9 +202,9 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
         editing={editing?.mode === 'edit' ? editing : undefined}
         onClose={() => setEditing(null)}
         onSubmit={async (value, id) => {
-          if (!Object.keys(asObj(value.plugins) ?? {}).length) throw new Error('Adicione um plugin de autenticação')
+          if (!Object.keys(asObj(value.plugins) ?? {}).length) throw new Error(t('credentials.plugin_required'))
           await api('PUT', `${base}/${encodeURIComponent(id)}`, value)
-          done('Salva', `Credencial ${id} salva`)
+          done(t('credentials.saved_title'), t('credentials.saved', { id }))
         }}
       />
     </Stack>

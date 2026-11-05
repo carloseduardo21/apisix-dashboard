@@ -32,9 +32,13 @@ import {
   IconUserShield,
 } from '@tabler/icons-react'
 import { PageHeader } from '../components/PageHeader'
-import { avatarColor, initials } from '../components/roles'
+import { avatarColor, initials, ROLE_LABEL } from '../components/roles'
 import { api, type DashboardUser, type Role } from '../api'
 import { useAuth } from '../auth'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
+import { formatDate, formatDateTime } from '../i18n/format'
 
 const isRole = (r: string): r is Role => r === 'viewer' || r === 'operator' || r === 'admin'
 
@@ -42,20 +46,20 @@ const confirm = (title: string, text: string, run: () => void, danger = false) =
   modals.openConfirmModal({
     title,
     children: <Text size="sm">{text}</Text>,
-    labels: { confirm: 'Confirmar', cancel: 'Cancelar' },
+    labels: { confirm: i18n.t('common.confirm'), cancel: i18n.t('common.cancel') },
     confirmProps: danger ? { color: 'red' } : undefined,
     onConfirm: run,
   })
 
-const ROLES = [
-  { value: 'viewer', label: 'Leitura (viewer)' },
-  { value: 'operator', label: 'Operador (operator)' },
-  { value: 'admin', label: 'Administrador (admin)' },
-]
+const ROLE_KEYS: Role[] = ['viewer', 'operator', 'admin']
 
-const fmt = (s: string | null) => (s ? new Date(s).toLocaleString('pt-BR') : '—')
+/** Select options for the roles, in the current language. */
+const roleOptions = (t: TFunction) => ROLE_KEYS.map((r) => ({ value: r, label: `${t(ROLE_LABEL[r])} (${r})` }))
+
+const fmt = (s: string | null) => (s ? formatDateTime(s) : '—')
 
 export function Users() {
+  const { t } = useTranslation()
   const { me } = useAuth()
   const qc = useQueryClient()
   const { data: users = [], isPending } = useQuery({
@@ -68,7 +72,7 @@ export function Users() {
   const action = useMutation({
     mutationFn: ({ method, path, body }: { method: string; path: string; body?: unknown }) => api(method, path, body),
     onSuccess: () => {
-      notifications.show({ color: 'green', message: 'Alteração aplicada' })
+      notifications.show({ color: 'green', message: t('users.applied') })
       void qc.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (e) => notifications.show({ color: 'red', message: e.message }),
@@ -78,11 +82,11 @@ export function Users() {
     <>
       <PageHeader
         icon={IconUserShield}
-        title="Usuários"
-        description="Quem acessa a dashboard e com qual perfil. MFA é obrigatório para todos."
+        title={t('users.title')}
+        description={t('users.description')}
         actions={
           <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
-            Novo usuário
+            {t('users.new')}
           </Button>
         }
       />
@@ -92,18 +96,18 @@ export function Users() {
           <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
             <Table.Thead bg="var(--mantine-color-default-hover)">
               <Table.Tr>
-                <Table.Th>Usuário</Table.Th>
-                <Table.Th>Perfil</Table.Th>
-                <Table.Th>Status</Table.Th>
+                <Table.Th>{t('users.col_user')}</Table.Th>
+                <Table.Th>{t('users.col_role')}</Table.Th>
+                <Table.Th>{t('common.status')}</Table.Th>
                 <Table.Th>MFA</Table.Th>
-                <Table.Th>Último login</Table.Th>
+                <Table.Th>{t('users.col_last_login')}</Table.Th>
                 <Table.Th w={60} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {isPending && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>Carregando...</Table.Td>
+                  <Table.Td colSpan={6}>{t('users.loading')}</Table.Td>
                 </Table.Tr>
               )}
               {users.map((u) => {
@@ -122,12 +126,12 @@ export function Users() {
                             </Text>
                             {self && (
                               <Badge size="xs" variant="outline">
-                                você
+                                {t('users.you')}
                               </Badge>
                             )}
                           </Group>
                           <Text size="xs" c="dimmed">
-                            desde {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                            {t('users.since', { date: formatDate(u.created_at) })}
                           </Text>
                         </div>
                       </Group>
@@ -136,7 +140,7 @@ export function Users() {
                       <Select
                         size="xs"
                         w={200}
-                        data={ROLES}
+                        data={roleOptions(t)}
                         value={u.role}
                         disabled={self}
                         allowDeselect={false}
@@ -144,8 +148,8 @@ export function Users() {
                           role &&
                           isRole(role) &&
                           confirm(
-                            'Alterar perfil',
-                            `Alterar o perfil de ${u.username} para ${role}? As sessões ativas do usuário serão encerradas.`,
+                            t('users.change_role_title'),
+                            t('users.change_role_confirm', { username: u.username, role: t(ROLE_LABEL[role]) }),
                             () =>
                               action.mutate({
                                 method: 'PATCH',
@@ -160,21 +164,21 @@ export function Users() {
                       <Group gap={4}>
                         {u.disabled ? (
                           <Badge color="gray" variant="light">
-                            inativo
+                            {t('common.inactive')}
                           </Badge>
                         ) : (
                           <Badge color="teal" variant="dot">
-                            ativo
+                            {t('common.active')}
                           </Badge>
                         )}
                         {u.locked && (
                           <Badge color="red" variant="light">
-                            bloqueado
+                            {t('users.locked')}
                           </Badge>
                         )}
                         {u.must_change_password && (
                           <Badge color="yellow" variant="light">
-                            trocar senha
+                            {t('users.must_change')}
                           </Badge>
                         )}
                       </Group>
@@ -182,11 +186,11 @@ export function Users() {
                     <Table.Td>
                       {u.mfa_enrolled ? (
                         <Badge color="teal" variant="light" leftSection={<IconShieldCheck size={12} />}>
-                          configurado
+                          {t('users.mfa_enrolled')}
                         </Badge>
                       ) : (
                         <Badge color="orange" variant="light">
-                          pendente
+                          {t('users.mfa_pending')}
                         </Badge>
                       )}
                     </Table.Td>
@@ -197,32 +201,32 @@ export function Users() {
                       {!self && (
                         <Menu position="bottom-end">
                           <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray">
+                            <ActionIcon variant="subtle" color="gray" aria-label={t('page.actions')}>
                               <IconDots size={18} />
                             </ActionIcon>
                           </Menu.Target>
                           <Menu.Dropdown>
                             <Menu.Item leftSection={<IconKey size={16} />} onClick={() => setResetting(u)}>
-                              Definir senha temporária
+                              {t('users.set_temp_password')}
                             </Menu.Item>
                             <Menu.Item
                               leftSection={<IconShieldOff size={16} />}
                               onClick={() =>
                                 confirm(
-                                  'Redefinir MFA',
-                                  `O usuário ${u.username} deverá configurar o MFA novamente no próximo login.`,
+                                  t('users.reset_mfa'),
+                                  t('users.reset_mfa_confirm', { username: u.username }),
                                   () => action.mutate({ method: 'POST', path: `/api/users/${u.id}/reset-mfa` }),
                                 )
                               }
                             >
-                              Redefinir MFA
+                              {t('users.reset_mfa')}
                             </Menu.Item>
                             {u.locked && (
                               <Menu.Item
                                 leftSection={<IconLockOpen size={16} />}
                                 onClick={() => action.mutate({ method: 'POST', path: `/api/users/${u.id}/unlock` })}
                               >
-                                Desbloquear
+                                {t('users.unlock')}
                               </Menu.Item>
                             )}
                             <Menu.Item
@@ -235,7 +239,7 @@ export function Users() {
                                 })
                               }
                             >
-                              {u.disabled ? 'Reativar' : 'Desativar'}
+                              {u.disabled ? t('users.enable') : t('users.disable')}
                             </Menu.Item>
                             <Menu.Divider />
                             <Menu.Item
@@ -243,14 +247,14 @@ export function Users() {
                               leftSection={<IconTrash size={16} />}
                               onClick={() =>
                                 confirm(
-                                  'Excluir usuário',
-                                  `Excluir ${u.username}? Prefira desativar para manter o histórico claro.`,
+                                  t('users.delete_title'),
+                                  t('users.delete_confirm', { username: u.username }),
                                   () => action.mutate({ method: 'DELETE', path: `/api/users/${u.id}` }),
                                   true,
                                 )
                               }
                             >
-                              Excluir
+                              {t('common.delete')}
                             </Menu.Item>
                           </Menu.Dropdown>
                         </Menu>
@@ -271,6 +275,7 @@ export function Users() {
 }
 
 function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [username, setUsername] = useState('')
   const [role, setRole] = useState<string>('viewer')
@@ -278,7 +283,7 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
   const create = useMutation({
     mutationFn: () => api('POST', '/api/users', { username, role, password }),
     onSuccess: () => {
-      notifications.show({ color: 'green', message: `Usuário ${username} criado` })
+      notifications.show({ color: 'green', message: t('users.created', { username }) })
       void qc.invalidateQueries({ queryKey: ['users'] })
       setUsername('')
       setPassword('')
@@ -286,24 +291,35 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
     },
   })
   return (
-    <Modal opened={opened} onClose={onClose} title="Novo usuário">
+    <Modal opened={opened} onClose={onClose} title={t('users.new')}>
       <Stack>
         {create.error && <Alert color="red">{create.error.message}</Alert>}
-        <TextInput label="Usuário" value={username} onChange={(e) => setUsername(e.currentTarget.value)} required />
-        <Select label="Perfil" data={ROLES} value={role} onChange={(v) => v && setRole(v)} allowDeselect={false} />
+        <TextInput
+          label={t('users.col_user')}
+          value={username}
+          onChange={(e) => setUsername(e.currentTarget.value)}
+          required
+        />
+        <Select
+          label={t('users.col_role')}
+          data={roleOptions(t)}
+          value={role}
+          onChange={(v) => v && setRole(v)}
+          allowDeselect={false}
+        />
         <PasswordInput
-          label="Senha temporária"
-          description="O usuário deverá trocá-la e configurar o MFA no primeiro acesso. Compartilhe por um canal seguro."
+          label={t('users.temp_password')}
+          description={t('users.temp_password_hint')}
           value={password}
           onChange={(e) => setPassword(e.currentTarget.value)}
           required
         />
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => create.mutate()} loading={create.isPending}>
-            Criar
+            {t('users.create')}
           </Button>
         </Group>
       </Stack>
@@ -312,36 +328,37 @@ function CreateUserModal({ opened, onClose }: { opened: boolean; onClose: () => 
 }
 
 function ResetPasswordModal({ user, onClose }: { user: DashboardUser | null; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [password, setPassword] = useState('')
   const reset = useMutation({
     mutationFn: () => {
-      if (!user) throw new Error('Nenhum usuário selecionado')
+      if (!user) throw new Error(t('users.no_user_selected'))
       return api('POST', `/api/users/${user.id}/password`, { password })
     },
     onSuccess: () => {
-      notifications.show({ color: 'green', message: 'Senha temporária definida' })
+      notifications.show({ color: 'green', message: t('users.temp_password_set') })
       void qc.invalidateQueries({ queryKey: ['users'] })
       setPassword('')
       onClose()
     },
   })
   return (
-    <Modal opened={!!user} onClose={onClose} title={`Senha temporária para ${user?.username ?? ''}`}>
+    <Modal opened={!!user} onClose={onClose} title={t('users.temp_password_for', { username: user?.username ?? '' })}>
       <Stack>
         {reset.error && <Alert color="red">{reset.error.message}</Alert>}
         <PasswordInput
-          label="Nova senha temporária"
-          description="As sessões do usuário serão encerradas e ele deverá trocar a senha no próximo login."
+          label={t('users.new_temp_password')}
+          description={t('users.new_temp_password_hint')}
           value={password}
           onChange={(e) => setPassword(e.currentTarget.value)}
         />
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => reset.mutate()} loading={reset.isPending}>
-            Definir
+            {t('users.set')}
           </Button>
         </Group>
       </Stack>

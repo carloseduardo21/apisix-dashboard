@@ -256,7 +256,8 @@ func writeMessages(w http.ResponseWriter, status int, msgs ...i18n.Message) {
 		for i, m := range msgs {
 			texts[i] = m.String()
 		}
-		body = errorBody{Error: strings.Join(texts, "; "), Code: "api.multiple_errors", Details: msgs}
+		multi := i18n.M("api.multiple_errors", "multiple problems were found")
+		body = errorBody{Error: strings.Join(texts, "; "), Code: multi.Code, Details: msgs}
 	}
 	writeJSON(w, status, body)
 }

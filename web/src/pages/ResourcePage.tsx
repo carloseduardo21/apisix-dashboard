@@ -48,6 +48,8 @@ import { ResourceEditor } from '../components/ResourceEditor'
 import { ServiceDetails } from '../components/ServiceDetails'
 import { isManagedSSL, type ResourceDef } from '../resources'
 import { text } from '../values'
+import { Trans, useTranslation } from 'react-i18next'
+import { formatDateTime } from '../i18n/format'
 
 // Fields managed by APISIX that must not be sent back on update.
 const READ_ONLY = ['create_time', 'update_time', 'validity_start', 'validity_end']
@@ -58,11 +60,16 @@ function editable(value: Record<string, unknown>) {
   return out
 }
 
-const fmtTime = (v: unknown) => (typeof v === 'number' ? new Date(v * 1000).toLocaleString('pt-BR') : '—')
+const fmtTime = (v: unknown) => (typeof v === 'number' ? formatDateTime(v * 1000) : '—')
 
 type Editing = { mode: 'create' } | { mode: 'edit'; id: string; value: Record<string, unknown> }
 
 export function ResourcePage({ def }: { def: ResourceDef }) {
+  const { t } = useTranslation()
+  const name = t(`resources.${def.key}.singular`)
+  const context = t(`resources.${def.key}.gender`)
+  const label = t(`resources.${def.key}.label`)
+  const description = t(`resources.${def.key}.description`)
   const { me } = useAuth()
   const qc = useQueryClient()
   const writable = canWrite(me.role)
@@ -131,8 +138,8 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       notifications.show({
         color: 'teal',
         icon: <IconCheck size={18} />,
-        title: 'Salvo',
-        message: `${def.singular} salvo com sucesso`,
+        title: t('page.saved'),
+        message: t('resources.saved', { name, context }),
       })
       void qc.invalidateQueries({ queryKey })
     },
@@ -145,24 +152,23 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       notifications.show({
         color: 'teal',
         icon: <IconCheck size={18} />,
-        title: 'Excluído',
-        message: `${def.singular} excluído`,
+        title: t('page.deleted'),
+        message: t('resources.deleted', { name, context }),
       })
       void qc.invalidateQueries({ queryKey })
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao excluir', message: e.message }),
+    onError: (e) => notifications.show({ color: 'red', title: t('page.delete_failed'), message: e.message }),
   })
 
   const confirmDelete = (id: string) =>
     modals.openConfirmModal({
-      title: <Text fw={600}>Excluir {def.singular}</Text>,
+      title: <Text fw={600}>{t('resources.delete_title', { name })}</Text>,
       children: (
         <Text size="sm">
-          Tem certeza que deseja excluir <Code>{id}</Code>? A alteração é aplicada imediatamente no gateway e fica
-          registrada na auditoria.
+          <Trans i18nKey="page.delete_confirm" values={{ id }} components={{ code: <Code /> }} />
         </Text>
       ),
-      labels: { confirm: 'Excluir', cancel: 'Cancelar' },
+      labels: { confirm: t('common.delete'), cancel: t('common.cancel') },
       confirmProps: { color: 'red', leftSection: <IconTrash size={16} /> },
       onConfirm: () => remove.mutate(id),
     })
@@ -181,8 +187,8 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
     <>
       <PageHeader
         icon={def.icon}
-        title={def.label}
-        description={def.description}
+        title={label}
+        description={description}
         badge={
           total !== undefined && (
             <Badge variant="light" size="lg" radius="xl">
@@ -193,20 +199,19 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
         actions={
           writable && (
             <Button leftSection={<IconPlus size={16} />} onClick={() => setEditing({ mode: 'create' })}>
-              Novo {def.singular}
+              {t('resources.new', { name, context })}
             </Button>
           )
         }
       />
 
       {isStreamDisabled(error) ? (
-        <Alert color="gray" icon={<IconAlertCircle size={16} />} title="Modo stream desativado" mb="md">
-          Habilite <code>apisix.proxy_mode: http&stream</code> e <code>stream_proxy</code> no config.yaml do APISIX para
-          usar stream routes.
+        <Alert color="gray" icon={<IconAlertCircle size={16} />} title={t('page.stream_disabled_title')} mb="md">
+          <Trans i18nKey="page.stream_disabled" components={{ code: <code /> }} />
         </Alert>
       ) : (
         error && (
-          <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar" mb="md">
+          <Alert color="red" icon={<IconAlertCircle size={16} />} title={t('common.load_error')} mb="md">
             {error.message}
           </Alert>
         )
@@ -215,7 +220,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       <Card padding={0}>
         <Group justify="space-between" p="md" gap="sm">
           <TextInput
-            placeholder={`Buscar ${def.label.toLowerCase()}...`}
+            placeholder={t('resources.search', { label: label.toLowerCase() })}
             leftSection={<IconSearch size={16} />}
             value={filter}
             onChange={(e) => {
@@ -224,13 +229,13 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
             }}
             w={320}
           />
-          <Tooltip label="Recarregar">
+          <Tooltip label={t('common.reload')}>
             <ActionIcon
               variant="default"
               size={36}
               onClick={() => refetch()}
               loading={isFetching}
-              aria-label="Recarregar"
+              aria-label={t('common.reload')}
             >
               <IconRefresh size={18} />
             </ActionIcon>
@@ -246,8 +251,8 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
         ) : rows.length === 0 ? (
           <EmptyState
             icon={def.icon}
-            title={filter ? 'Nenhum resultado' : `Nenhum ${def.singular} cadastrado`}
-            description={filter ? 'Tente outro termo de busca.' : def.description}
+            title={filter ? t('resources.no_results') : t('resources.empty', { name, context })}
+            description={filter ? t('resources.try_other') : description}
             action={
               writable &&
               !filter &&
@@ -257,7 +262,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                   leftSection={<IconPlus size={16} />}
                   onClick={() => setEditing({ mode: 'create' })}
                 >
-                  Criar {def.singular}
+                  {t('resources.create', { name })}
                 </Button>
               )
             }
@@ -269,7 +274,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                 <Table.Thead bg="var(--mantine-color-default-hover)">
                   <Table.Tr>
                     {def.columns.map((c) => (
-                      <Table.Th key={c.label}>{c.label}</Table.Th>
+                      <Table.Th key={c.label}>{t(c.label)}</Table.Th>
                     ))}
                     <Table.Th w={60} />
                   </Table.Tr>
@@ -283,17 +288,17 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                       <Table.Td onClick={(e) => e.stopPropagation()}>
                         <Menu position="bottom-end" withinPortal shadow="md" width={180}>
                           <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                            <ActionIcon variant="subtle" color="gray" aria-label={t('page.actions')}>
                               <IconDots size={18} />
                             </ActionIcon>
                           </Menu.Target>
                           <Menu.Dropdown>
                             <Menu.Item leftSection={<IconEye size={16} />} onClick={() => setViewing(item)}>
-                              Visualizar
+                              {t('page.view')}
                             </Menu.Item>
                             {def.key === 'consumers' && (
                               <Menu.Item leftSection={<IconKey size={16} />} onClick={() => setViewing(item)}>
-                                Credenciais
+                                {t('page.credentials')}
                               </Menu.Item>
                             )}
                             {isManagedSSL(def.key, item.value) ? (
@@ -302,13 +307,13 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                                 to="/certificados"
                                 leftSection={<IconCertificate2 size={16} />}
                               >
-                                Certificados automáticos
+                                {t('nav.acme')}
                               </Menu.Item>
                             ) : (
                               writable && (
                                 <>
                                   <Menu.Item leftSection={<IconEdit size={16} />} onClick={() => openEdit(item)}>
-                                    Editar
+                                    {t('common.edit')}
                                   </Menu.Item>
                                   <Menu.Divider />
                                   <Menu.Item
@@ -316,7 +321,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                                     leftSection={<IconTrash size={16} />}
                                     onClick={() => confirmDelete(id)}
                                   >
-                                    Excluir
+                                    {t('common.delete')}
                                   </Menu.Item>
                                 </>
                               )
@@ -331,13 +336,17 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
             </Table.ScrollContainer>
             <Group justify="space-between" p="md" gap="sm">
               <Text size="sm" c="dimmed">
-                {(current - 1) * size + 1}–{Math.min(current * size, rows.length)} de {rows.length}
+                {t('page.range', {
+                  from: (current - 1) * size + 1,
+                  to: Math.min(current * size, rows.length),
+                  total: rows.length,
+                })}
               </Text>
               <Group gap="sm">
                 <Select
                   size="xs"
                   w={110}
-                  data={['10', '25', '50', '100'].map((v) => ({ value: v, label: `${v} / página` }))}
+                  data={['10', '25', '50', '100'].map((v) => ({ value: v, label: t('page.per_page', { n: v }) }))}
                   value={pageSize}
                   onChange={(v) => {
                     setPageSize(v ?? '25')
@@ -364,7 +373,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                 <def.icon size={18} />
               </ThemeIcon>
               <div>
-                <Text fw={600}>{text(viewing.value.name ?? viewing.value.username ?? def.singular)}</Text>
+                <Text fw={600}>{text(viewing.value.name ?? viewing.value.username ?? name)}</Text>
                 <Text size="xs" c="dimmed" ff="monospace">
                   {itemId(def.key, viewing)}
                 </Text>
@@ -378,7 +387,10 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
           <Stack>
             <Group justify="space-between">
               <Text size="xs" c="dimmed">
-                Criado em {fmtTime(viewing.value.create_time)} · atualizado em {fmtTime(viewing.value.update_time)}
+                {t('page.timestamps', {
+                  created: fmtTime(viewing.value.create_time),
+                  updated: fmtTime(viewing.value.update_time),
+                })}
               </Text>
               <Group gap="xs">
                 <CopyButton value={JSON.stringify(viewing.value, null, 2)}>
@@ -389,7 +401,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                       leftSection={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
                       onClick={copy}
                     >
-                      {copied ? 'Copiado' : 'Copiar JSON'}
+                      {copied ? t('page.copied') : t('page.copy_json')}
                     </Button>
                   )}
                 </CopyButton>
@@ -402,7 +414,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                     to="/certificados"
                     leftSection={<IconCertificate2 size={14} />}
                   >
-                    Emitido automaticamente
+                    {t('page.issued_automatically')}
                   </Button>
                 ) : (
                   writable && (
@@ -414,7 +426,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                         setViewing(null)
                       }}
                     >
-                      Editar
+                      {t('common.edit')}
                     </Button>
                   )
                 )}

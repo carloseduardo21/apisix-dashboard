@@ -34,6 +34,7 @@ import {
   type Obj,
 } from './types'
 import { text } from '../values'
+import i18n from '../i18n'
 
 export interface FieldProps {
   schema: JSONSchema
@@ -57,9 +58,9 @@ function describe(s: JSONSchema): string | undefined {
   const parts: string[] = []
   if (s.description) parts.push(s.description)
   const d = defaultText(s)
-  if (d !== undefined && s.type !== 'boolean') parts.push(`padrão: ${d}`)
+  if (d !== undefined && s.type !== 'boolean') parts.push(i18n.t('schema.default', { value: d }))
   if (s.minimum !== undefined || s.maximum !== undefined) {
-    parts.push(`faixa: ${s.minimum ?? '−∞'} – ${s.maximum ?? '∞'}`)
+    parts.push(i18n.t('schema.range', { min: s.minimum ?? '−∞', max: s.maximum ?? '∞' }))
   }
   return parts.length ? parts.join(' · ') : undefined
 }
@@ -162,9 +163,7 @@ function StringField({ schema, value, onChange, name, required, path, sensitive 
     return (
       <PasswordInput
         {...common}
-        description={
-          str === MASKED ? 'Valor atual mascarado. Mantenha para preservar ou digite um novo.' : common.description
-        }
+        description={str === MASKED ? i18n.t('schema.masked') : common.description}
         onChange={(e) => onChange(e.currentTarget.value)}
       />
     )
@@ -238,7 +237,7 @@ function ArrayField(props: FieldProps) {
     return (
       <TagsInput
         label={name}
-        description={[describe(schema), 'Enter para adicionar'].filter(Boolean).join(' · ')}
+        description={[describe(schema), i18n.t('schema.enter_to_add')].filter(Boolean).join(' · ')}
         withAsterisk={required}
         value={list.map(String)}
         onChange={(v) => onChange(numeric ? v.map(Number).filter((n) => !Number.isNaN(n)) : v)}
@@ -282,7 +281,7 @@ function ArrayField(props: FieldProps) {
             onClick={() => onChange([...list, {}])}
             w="fit-content"
           >
-            Adicionar
+            {i18n.t('common.add')}
           </Button>
         </Stack>
       </Input.Wrapper>
@@ -380,7 +379,7 @@ export function ObjectFields({
   path,
   sensitive,
   exclude = NO_EXCLUDE,
-  moreLabel = 'Mais opções',
+  moreLabel,
 }: ObjectFieldsProps) {
   const schema = normalize(raw)
   const obj = isObj(value) ? value : {}
@@ -417,7 +416,7 @@ export function ObjectFields({
             <Group gap={4}>
               {open ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
               <Text size="sm" c="dimmed">
-                {moreLabel} ({rest.length})
+                {moreLabel ?? i18n.t('schema.more_options')} ({rest.length})
               </Text>
             </Group>
           </UnstyledButton>
@@ -518,7 +517,7 @@ export function KeyValueEditor({
           onClick={() => setRows([...rows, ['', '']])}
           w="fit-content"
         >
-          Adicionar
+          {i18n.t('common.add')}
         </Button>
       </Stack>
     </Input.Wrapper>
@@ -560,7 +559,7 @@ export function JsonField({ schema, value, onChange, name, required }: FieldProp
           last.current = parsed
           onChange(parsed)
         } catch {
-          setError('JSON inválido')
+          setError(i18n.t('editor.invalid_json_short'))
         }
       }}
       styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 13 } }}

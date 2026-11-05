@@ -3,9 +3,16 @@ import type { Obj } from '../../schema/types'
 export type Kind = 'upstream' | 'service' | 'consumer' | 'credential' | 'route' | 'global_plugin'
 export type Action = 'create' | 'update' | 'overwrite' | 'unchanged' | 'conflict' | 'blocked'
 
+/** A translation note from the backend (see internal/kong). message is English. */
 export interface Note {
   level: 'info' | 'warn' | 'error'
   message: string
+  code?: string
+  params?: Record<string, string>
+  plugin?: string
+  reason?: { code?: string; params?: Record<string, string>; message?: string }
+  /** UI only: which object of a group the note is about. */
+  prefix?: string
 }
 
 export interface PluginMap {
@@ -71,6 +78,8 @@ export interface KongInfo {
   url?: string
   info?: { version: string; hostname: string; database: string }
   error?: string
+  code?: string
+  params?: Record<string, string>
   settings?: Settings
   builtin_plugins?: string[]
 }
@@ -84,7 +93,8 @@ export interface Job {
   total: number
   done: number
   error?: string
-  log: { ts: string; level: Note['level']; message: string }[]
+  error_message?: { code: string; params?: Record<string, string> }
+  log: { ts: string; level: Note['level']; message: string; code?: string; params?: Record<string, string> }[]
   results: {
     kind: Kind
     kong_name: string
@@ -105,27 +115,25 @@ export interface MigrationRecord {
   migrated_at: string
 }
 
-export const KIND_LABEL: Record<Kind, string> = {
-  upstream: 'Upstream',
-  service: 'Service',
-  consumer: 'Consumer',
-  credential: 'Credencial',
-  route: 'Rota',
-  global_plugin: 'Plugin global',
-}
+/** Translation keys of the object kinds: t(KIND_LABEL[kind]). */
+export const KIND_LABEL = {
+  upstream: 'kong.kind.upstream',
+  service: 'kong.kind.service',
+  consumer: 'kong.kind.consumer',
+  credential: 'kong.kind.credential',
+  route: 'kong.kind.route',
+  global_plugin: 'kong.kind.global_plugin',
+} as const satisfies Record<Kind, string>
 
-export const ACTION: Record<Action, { label: string; color: string; hint: string }> = {
-  create: { label: 'criar', color: 'indigo', hint: 'Ainda não existe no APISIX' },
-  update: { label: 'atualizar', color: 'yellow', hint: 'Migrado antes; o Kong ou os padrões mudaram' },
-  overwrite: {
-    label: 'sobrescrever',
-    color: 'orange',
-    hint: 'Já existe no APISIX sem ter vindo da migração; será substituído',
-  },
-  unchanged: { label: 'migrado', color: 'teal', hint: 'Já está no APISIX como no Kong' },
-  conflict: { label: 'conflito', color: 'orange', hint: 'Já existe no APISIX sem ter vindo da migração; será pulado' },
-  blocked: { label: 'bloqueado', color: 'red', hint: 'Não pode ser migrado; veja os avisos' },
-}
+/** Plan actions: color plus translation keys of the label and hint. */
+export const ACTION = {
+  create: { label: 'kong.action.create', color: 'indigo', hint: 'kong.action.create_hint' },
+  update: { label: 'kong.action.update', color: 'yellow', hint: 'kong.action.update_hint' },
+  overwrite: { label: 'kong.action.overwrite', color: 'orange', hint: 'kong.action.overwrite_hint' },
+  unchanged: { label: 'kong.action.unchanged', color: 'teal', hint: 'kong.action.unchanged_hint' },
+  conflict: { label: 'kong.action.conflict', color: 'orange', hint: 'kong.action.conflict_hint' },
+  blocked: { label: 'kong.action.blocked', color: 'red', hint: 'kong.action.blocked_hint' },
+} as const satisfies Record<Action, { label: string; color: string; hint: string }>
 
 export const writes = (a: Action) => a === 'create' || a === 'update' || a === 'overwrite'
 

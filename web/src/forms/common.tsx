@@ -5,6 +5,7 @@ import { api, itemId, type AdminList } from '../api'
 import { KeyValueEditor, ObjectFields } from '../schema/SchemaForm'
 import { isObj, setKey, useCatalog, type Obj } from '../schema/types'
 import { stringRecord, text } from '../values'
+import i18n from '../i18n'
 
 export interface FormProps {
   value: Obj
@@ -28,7 +29,7 @@ export function textProps(value: Obj, onChange: (v: Obj) => void, key: string) {
 export function NameDesc({
   value,
   onChange,
-  nameLabel = 'Nome',
+  nameLabel,
 }: {
   value: Obj
   onChange: (v: Obj) => void
@@ -36,8 +37,14 @@ export function NameDesc({
 }) {
   return (
     <>
-      <TextInput label={nameLabel} {...textProps(value, onChange, 'name')} />
-      <Textarea label="Descrição" autosize minRows={1} maxRows={4} {...textProps(value, onChange, 'desc')} />
+      <TextInput label={nameLabel ?? i18n.t('common.name')} {...textProps(value, onChange, 'name')} />
+      <Textarea
+        label={i18n.t('common.description')}
+        autosize
+        minRows={1}
+        maxRows={4}
+        {...textProps(value, onChange, 'desc')}
+      />
     </>
   )
 }
@@ -118,7 +125,7 @@ export function ResourceSelect({
   // Keep a dangling reference visible instead of silently clearing it.
   const options =
     current && !data.some((o) => o.value === current)
-      ? [...data, { value: current, label: `${current} (não encontrado)` }]
+      ? [...data, { value: current, label: i18n.t('forms.not_found', { value: current }) }]
       : data
   return (
     <Select
@@ -131,7 +138,7 @@ export function ResourceSelect({
       searchable
       clearable={!required}
       placeholder={isPending ? 'Carregando...' : 'Selecione'}
-      nothingFoundMessage="Nada encontrado"
+      nothingFoundMessage={i18n.t('nav.nothing_found')}
       comboboxProps={{ withinPortal: true }}
     />
   )
@@ -140,8 +147,8 @@ export function ResourceSelect({
 export function LabelsField({ value, onChange }: { value: Obj; onChange: (v: Obj) => void }) {
   return (
     <KeyValueEditor
-      label="Labels"
-      description="Pares chave/valor para organizar e filtrar recursos"
+      label={i18n.t('forms.labels')}
+      description={i18n.t('forms.labels_hint')}
       value={isObj(value.labels) ? stringRecord(value.labels) : undefined}
       onChange={(v) => onChange(setKey(value, 'labels', v))}
     />

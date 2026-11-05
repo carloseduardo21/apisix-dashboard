@@ -1,4 +1,4 @@
-# Dashboard for Apache APISIX
+# Lintel for Apache APISIX
 
 Self-hosted web dashboard for the **Apache APISIX Admin API** (traditional mode, etcd),
 designed for **PCI DSS 4.0** environments and Docker Swarm. It ships as a **single Go
@@ -6,10 +6,22 @@ binary** with the React SPA embedded. It is the control plane of an entire API g
 treat every change as security-sensitive.
 
 - Repository / Go module: `github.com/carloseduardo21/apisix-dashboard`
-- Public name: "<Name> for Apache APISIX" (ASF trademark policy). Never brand it
-  "APISIX Dashboard" or imply it is an Apache project.
-- Docs language: **English** (all docs, code comments, commit messages).
-  UI: currently PT-BR, **i18n is planned** (see "Roadmap / decisions").
+- Public name: **Lintel for Apache APISIX** (ASF trademark policy). Never brand it
+  "APISIX Dashboard" or imply it is an Apache project. Binary/module/repo keep the
+  technical name `apisix-dashboard`.
+- Docs language: **English** (all docs, code comments, commit messages, CLI, logs).
+- UI languages: **en** (source and fallback), **pt-BR**, **es** — i18next with
+  type-checked keys (`web/src/i18n`). The backend never translates: user-facing API
+  messages are stable **codes + params** (`internal/i18n`) translated by the UI.
+
+### i18n rules
+- Every user-facing UI string goes through `t('key')` (or `<Trans>` for markup);
+  add the key to **all three** `web/src/i18n/locales/*.json`.
+- Every user-facing backend message uses `i18n.M/E/Wrap(code, englishTemplate, kv...)`
+  (or `writeError`, `validationErr`, log helpers) and needs `server.<code>` in the
+  three catalogs; `en` must equal the Go template.
+- `go test ./internal/i18n` enforces both (codes present, identical keys and
+  `{placeholders}` across languages). Audit records, logs and the CLI stay English.
 
 Stack-specific rules live in `internal/CLAUDE.md` (Go, also applies to `cmd/`) and
 `web/CLAUDE.md` (React/TypeScript). Read them before touching those trees.
@@ -203,7 +215,7 @@ A change is done only when all of the following pass locally (and in CI):
 
 - [ ] `make fmt` leaves no diff; `make lint` (golangci-lint incl. gosec, Oxlint
       type-aware, Prettier check, `tsc --noEmit`) has **zero** findings.
-- [ ] `make test` passes; new behavior has tests (table-driven in Go; handler tests via
+- [ ] `make test` passes (includes the i18n catalog checks); new behavior has tests (table-driven in Go; handler tests via
       `httptest` for new/changed routes).
 - [ ] `make vuln` (govulncheck + `npm audit --audit-level=high`) shows no new findings;
       `make secrets` (gitleaks) is clean.
@@ -225,6 +237,5 @@ A change is done only when all of the following pass locally (and in CI):
   (session 15 m idle, lockout ≥30 m, ≤10 attempts, Secure cookie).
 
 ## Roadmap / pending decisions
-- i18n of the UI (main languages) — strings must become translation keys.
 - OIDC (Keycloak) login.
 - Plugin metadata UI, Swarm service discovery for upstreams, config history/rollback.

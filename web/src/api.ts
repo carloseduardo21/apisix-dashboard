@@ -1,5 +1,7 @@
 // Thin client for the dashboard backend. The APISIX admin key never reaches
 // the browser: everything goes through /api on the same origin.
+import { serverText } from './i18n/format'
+import { isObj, text } from './values'
 
 let csrfToken = ''
 let onUnauthorized: (() => void) | null = null
@@ -15,19 +17,47 @@ export function setUnauthorizedHandler(fn: () => void) {
 export class ApiError extends Error {
   status: number
   body: unknown
-  constructor(status: number, message: string, body: unknown) {
+  /** Stable error code from the backend (see internal/i18n), when present. */
+  code?: string
+  constructor(status: number, message: string, body: unknown, code?: string) {
     super(message)
     this.status = status
     this.body = body
+    this.code = code
   }
 }
 
+const stringParams = (v: unknown): Record<string, string> | undefined =>
+  isObj(v)
+    ? Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string'))
+    : undefined
+
+/** A backend message in the current language: {error, code, params} or a list in "details". */
+function messageOf(d: Record<string, unknown>): string | undefined {
+  if (Array.isArray(d.details) && d.details.length > 0) {
+    return d.details
+      .filter(isObj)
+      .map((m) => serverText({ code: text(m.code), params: stringParams(m.params) }))
+      .join('\n')
+  }
+  if (typeof d.code === 'string') {
+    return serverText({
+      code: d.code,
+      params: stringParams(d.params),
+      message: typeof d.error === 'string' ? d.error : undefined,
+    })
+  }
+  return undefined
+}
+
 function errorMessage(status: number, data: unknown): string {
-  if (data && typeof data === 'object') {
-    const d: Record<string, unknown> = Object.fromEntries(Object.entries(data))
-    if (typeof d.error === 'string') return d.error
-    if (typeof d.error_msg === 'string') return d.error_msg
-    if (typeof d.message === 'string') return d.message
+  if (isObj(data)) {
+    const translated = messageOf(data)
+    if (translated) return translated
+    // Errors relayed from the APISIX Admin API ({"error_msg": ...}) are English.
+    if (typeof data.error === 'string') return data.error
+    if (typeof data.error_msg === 'string') return data.error_msg
+    if (typeof data.message === 'string') return data.message
   }
   return `HTTP ${status}`
 }
@@ -43,18 +73,23 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     credentials: 'same-origin',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  const text = await res.text()
+  const raw = await res.text()
   let data: unknown
-  if (text) {
+  if (raw) {
     try {
-      data = JSON.parse(text)
+      data = JSON.parse(raw)
     } catch {
-      data = text
+      data = raw
     }
   }
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith('/api/auth/')) onUnauthorized?.()
-    throw new ApiError(res.status, errorMessage(res.status, data), data)
+    throw new ApiError(
+      res.status,
+      errorMessage(res.status, data),
+      data,
+      isObj(data) && typeof data.code === 'string' ? data.code : undefined,
+    )
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- typed contract with our own backend; callers narrow APISIX payloads
   return data as T

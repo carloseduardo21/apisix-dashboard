@@ -49,8 +49,12 @@ src/theme/            Mantine theme + global CSS
   check. Functional components and hooks only.
 - Server state via TanStack Query (query keys per resource, invalidate after
   mutations); show errors with `ApiError.message` (already safe, from the backend).
-- **i18n is planned**: do not scatter new hard-coded user-facing strings — keep them
-  together per component so they can be extracted to translation keys.
+- **i18n**: no hard-coded user-facing text. Use `useTranslation()`/`t('key')` in
+  components (`i18n.t` only in non-component helpers rendered by a translated
+  parent), `<Trans>` for strings with markup, `formatDate*`/`serverText`/`noteText`
+  from `src/i18n/format.ts` for dates and backend messages. Add every key to
+  `en.json`, `pt-BR.json` and `es.json` (placeholders `{name}`; avoid plural
+  suffixes, use neutral wording with counts).
 - Accessibility: labels on inputs, `aria-label` on icon-only buttons.
 - No new npm dependency without justification (size, maintenance, licence, audit
   status). Prefer Mantine/stdlib-of-the-browser solutions.

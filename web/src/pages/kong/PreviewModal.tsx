@@ -23,7 +23,6 @@ import { useMediaQuery } from '@mantine/hooks'
 import {
   IconAlertCircle,
   IconAlertTriangle,
-  IconArrowRight,
   IconCheck,
   IconInfoCircle,
   IconPlayerPlay,
@@ -32,11 +31,14 @@ import {
 } from '@tabler/icons-react'
 import { api } from '../../api'
 import { ACTION, KIND_LABEL, writes, type Job, type Note, type Plan, type PlanItem, type Selection } from './types'
+import { useTranslation } from 'react-i18next'
+import { formatTime, noteText, serverText } from '../../i18n/format'
 
 const NOTE_ICON = { info: IconInfoCircle, warn: IconAlertTriangle, error: IconAlertCircle }
 const NOTE_COLOR = { info: 'indigo', warn: 'orange', error: 'red' }
 
 export function NoteList({ notes }: { notes: Note[] }) {
+  useTranslation() // re-render on language change
   if (notes.length === 0) return null
   return (
     <Stack gap={4}>
@@ -50,7 +52,10 @@ export function NoteList({ notes }: { notes: Note[] }) {
               color={`var(--mantine-color-${NOTE_COLOR[n.level]}-6)`}
               style={{ flexShrink: 0, marginTop: 2 }}
             />
-            <Text size="sm">{n.message}</Text>
+            <Text size="sm">
+              {n.prefix ?? ''}
+              {noteText(n)}
+            </Text>
           </Group>
         )
       })}
@@ -59,17 +64,19 @@ export function NoteList({ notes }: { notes: Note[] }) {
 }
 
 export function ActionBadge({ action, size = 'sm' }: { action: PlanItem['action']; size?: string }) {
+  const { t } = useTranslation()
   const a = ACTION[action]
   return (
-    <Tooltip label={a.hint}>
+    <Tooltip label={t(a.hint)}>
       <Badge color={a.color} variant="light" size={size}>
-        {a.label}
+        {t(a.label)}
       </Badge>
     </Tooltip>
   )
 }
 
 export function PluginBadges({ item }: { item: PlanItem }) {
+  const { t } = useTranslation()
   if (!item.plugins?.length) return null
   const color = { ok: 'gray', warn: 'orange', error: 'red', ignored: 'gray', disabled: 'gray' }
   return (
@@ -80,12 +87,14 @@ export function PluginBadges({ item }: { item: PlanItem }) {
           key={i}
           label={
             p.status === 'ignored'
-              ? 'ignorado pela regra'
+              ? t('kong.preview.plugin_ignored')
               : p.status === 'disabled'
-                ? 'desabilitado no Kong'
+                ? t('kong.preview.plugin_disabled')
                 : p.apisix?.length
-                  ? `vira ${p.apisix.join(', ')}${p.custom ? ' (regra custom)' : ''}`
-                  : 'sem tradução'
+                  ? t(p.custom ? 'kong.preview.plugin_custom' : 'kong.preview.plugin_becomes', {
+                      plugins: p.apisix.join(', '),
+                    })
+                  : t('kong.preview.plugin_untranslated')
           }
         >
           <Badge
@@ -106,6 +115,7 @@ export function PluginBadges({ item }: { item: PlanItem }) {
 const json = (v: unknown) => JSON.stringify(v, null, 2)
 
 function ItemDetail({ item }: { item: PlanItem }) {
+  const { t } = useTranslation()
   const diff = item.current && (item.action === 'update' || item.action === 'overwrite' || item.action === 'conflict')
   return (
     <Stack gap="sm">
@@ -126,13 +136,13 @@ function ItemDetail({ item }: { item: PlanItem }) {
           <SimpleGrid cols={{ base: 1, md: 2 }}>
             <div>
               <Text size="xs" c="dimmed" fw={700} tt="uppercase" mb={4}>
-                Atual no APISIX
+                {t('kong.preview.current')}
               </Text>
               <Code block>{json(item.current)}</Code>
             </div>
             <div>
               <Text size="xs" c="dimmed" fw={700} tt="uppercase" mb={4}>
-                Vindo do Kong
+                {t('kong.preview.from_kong')}
               </Text>
               <Code block>{json(item.body)}</Code>
             </div>
@@ -145,32 +155,31 @@ function ItemDetail({ item }: { item: PlanItem }) {
 }
 
 const OUTCOME = {
-  success: { label: 'gravado', color: 'teal' },
-  failure: { label: 'falhou', color: 'red' },
-  rolled_back: { label: 'desfeito', color: 'orange' },
-  skipped: { label: 'pulado', color: 'gray' },
-}
+  success: { label: 'kong.outcome.success', color: 'teal' },
+  failure: { label: 'kong.outcome.failure', color: 'red' },
+  rolled_back: { label: 'kong.outcome.rolled_back', color: 'orange' },
+  skipped: { label: 'kong.outcome.skipped', color: 'gray' },
+} as const
 
 function JobView({ job }: { job: Job }) {
+  const { t } = useTranslation()
   const pct = job.total ? (job.done / job.total) * 100 : 0
   return (
     <Stack>
       {job.status === 'running' && (
         <Group gap="sm">
           <Loader size="sm" />
-          <Text fw={600}>
-            Aplicando {job.done} de {job.total}…
-          </Text>
+          <Text fw={600}>{t('kong.job.applying', { done: job.done, total: job.total })}</Text>
         </Group>
       )}
       {job.status === 'success' && (
-        <Alert color="teal" variant="light" icon={<IconCheck size={18} />} title="Migração concluída">
-          {job.done} objetos gravados no APISIX e registrados na auditoria.
+        <Alert color="teal" variant="light" icon={<IconCheck size={18} />} title={t('kong.job.done_title')}>
+          {t('kong.job.done', { count: job.done })}
         </Alert>
       )}
       {job.status === 'failed' && (
-        <Alert color="red" variant="light" icon={<IconRotate size={18} />} title="A migração falhou e foi desfeita">
-          {job.error}
+        <Alert color="red" variant="light" icon={<IconRotate size={18} />} title={t('kong.job.failed_title')}>
+          {job.error_message ? serverText({ ...job.error_message, message: job.error }) : job.error}
         </Alert>
       )}
       <Progress value={pct} color={job.status === 'failed' ? 'red' : 'teal'} animated={job.status === 'running'} />
@@ -182,9 +191,9 @@ function JobView({ job }: { job: Job }) {
             color={NOTE_COLOR[e.level]}
             bullet={e.level === 'error' ? <IconX size={11} /> : <IconCheck size={11} />}
           >
-            <Text size="sm">{e.message}</Text>
+            <Text size="sm">{serverText(e)}</Text>
             <Text size="xs" c="dimmed">
-              {new Date(e.ts).toLocaleTimeString('pt-BR')}
+              {formatTime(e.ts)}
             </Text>
           </Timeline.Item>
         ))}
@@ -193,10 +202,10 @@ function JobView({ job }: { job: Job }) {
         <Table verticalSpacing={6} fz="sm">
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Objeto</Table.Th>
+              <Table.Th>{t('kong.job.col_object')}</Table.Th>
               <Table.Th>APISIX</Table.Th>
-              <Table.Th>Ação</Table.Th>
-              <Table.Th>Resultado</Table.Th>
+              <Table.Th>{t('kong.job.col_action')}</Table.Th>
+              <Table.Th>{t('kong.job.col_result')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -205,7 +214,7 @@ function JobView({ job }: { job: Job }) {
               <Table.Tr key={i}>
                 <Table.Td>
                   <Text size="xs" c="dimmed">
-                    {KIND_LABEL[r.kind]}
+                    {t(KIND_LABEL[r.kind])}
                   </Text>
                   {r.kong_name}
                 </Table.Td>
@@ -217,7 +226,7 @@ function JobView({ job }: { job: Job }) {
                 </Table.Td>
                 <Table.Td>
                   <Badge size="xs" variant="light" color={OUTCOME[r.outcome].color}>
-                    {OUTCOME[r.outcome].label}
+                    {t(OUTCOME[r.outcome].label)}
                   </Badge>
                   {r.error && (
                     <Text size="xs" c="red" mt={2}>
@@ -244,6 +253,7 @@ export function PreviewModal({
   opened: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const mobile = useMediaQuery('(max-width: 48em)')
   const [confirmed, setConfirmed] = useState(false)
@@ -283,7 +293,7 @@ export function PreviewModal({
 
   const apply = useMutation({
     mutationFn: () => {
-      if (!plan.data) throw new Error('A pré-visualização ainda não foi carregada')
+      if (!plan.data) throw new Error(t('kong.preview.not_loaded'))
       return api<Job>('POST', '/api/migration/kong/apply', { ...selection, hash: plan.data.hash })
     },
     onSuccess: (j) => setJobId(j.id),
@@ -304,7 +314,7 @@ export function PreviewModal({
       onClose={onClose}
       size="90%"
       fullScreen={mobile}
-      title={<Text fw={700}>{jobId ? 'Aplicando a migração' : 'Pré-visualização da migração'}</Text>}
+      title={<Text fw={700}>{jobId ? t('kong.preview.title_applying') : t('kong.preview.title')}</Text>}
     >
       {jobId ? (
         current ? (
@@ -315,7 +325,7 @@ export function PreviewModal({
       ) : plan.isPending ? (
         <Group py="xl" justify="center">
           <Loader />
-          <Text c="dimmed">Lendo o Kong e comparando com o APISIX…</Text>
+          <Text c="dimmed">{t('kong.preview.loading')}</Text>
         </Group>
       ) : plan.error ? (
         <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
@@ -328,19 +338,16 @@ export function PreviewModal({
               .filter((a) => counts[a])
               .map((a) => (
                 <Badge key={a} color={ACTION[a].color} variant="light" size="lg">
-                  {counts[a]} {ACTION[a].label}
+                  {counts[a]} {t(ACTION[a].label)}
                 </Badge>
               ))}
           </Group>
           <Text size="sm" c="dimmed">
-            Ordem de gravação: upstreams <IconArrowRight size={12} /> services <IconArrowRight size={12} /> consumers{' '}
-            <IconArrowRight size={12} /> credenciais <IconArrowRight size={12} /> rotas <IconArrowRight size={12} />{' '}
-            plugins globais. Se algo falhar, o que este lote gravou é desfeito.
+            {t('kong.preview.order')}
           </Text>
           {skipped > 0 && (
             <Alert color="orange" variant="light" icon={<IconAlertTriangle size={16} />}>
-              {skipped} {skipped === 1 ? 'item não será aplicado' : 'itens não serão aplicados'} (bloqueados ou em
-              conflito). Os demais seguem normalmente.
+              {t('kong.preview.skipped', { count: skipped })}
             </Alert>
           )}
           <ScrollArea.Autosize mah="58vh" offsetScrollbars>
@@ -352,7 +359,7 @@ export function PreviewModal({
                       <div style={{ minWidth: 0 }}>
                         <Group gap={6} wrap="nowrap">
                           <Badge size="xs" variant="outline" color="gray">
-                            {KIND_LABEL[it.kind]}
+                            {t(KIND_LABEL[it.kind])}
                           </Badge>
                           <Text fw={600} size="sm" truncate>
                             {it.kong_name}
@@ -387,11 +394,11 @@ export function PreviewModal({
               checked={confirmed}
               onChange={(e) => setConfirmed(e.currentTarget.checked)}
               disabled={toWrite.length === 0}
-              label="Revisei o que será gravado no APISIX"
+              label={t('kong.preview.reviewed')}
             />
             <Group>
               <Button variant="default" onClick={onClose}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
               <Button
                 leftSection={<IconPlayerPlay size={16} />}
@@ -399,9 +406,7 @@ export function PreviewModal({
                 loading={apply.isPending}
                 onClick={() => apply.mutate()}
               >
-                {toWrite.length === 0
-                  ? 'Nada a aplicar'
-                  : `Aplicar ${toWrite.length} ${toWrite.length === 1 ? 'objeto' : 'objetos'}`}
+                {toWrite.length === 0 ? t('kong.preview.nothing') : t('kong.preview.apply', { count: toWrite.length })}
               </Button>
             </Group>
           </Group>
@@ -409,7 +414,7 @@ export function PreviewModal({
       )}
       {jobId && current && current.status !== 'running' && (
         <Group justify="flex-end" mt="md">
-          <Button onClick={onClose}>Fechar</Button>
+          <Button onClick={onClose}>{t('common.close')}</Button>
         </Group>
       )}
     </Modal>

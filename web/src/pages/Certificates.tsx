@@ -48,11 +48,15 @@ import { api, isAdmin, itemId, type AdminList } from '../api'
 import { useAuth } from '../auth'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
+import { Trans, useTranslation } from 'react-i18next'
+import { formatDate, formatDateTime, formatTime, serverText } from '../i18n/format'
 
 interface LogEntry {
   ts: string
   level: 'info' | 'warn' | 'error'
   message: string
+  code?: string
+  params?: Record<string, string>
 }
 
 export interface AcmeCert {
@@ -85,45 +89,48 @@ interface AcmeInfo {
 interface Provider {
   token_ok: boolean
   error?: string
+  code?: string
+  params?: Record<string, string>
   zones: { name: string; status: string }[]
   terms_of_service?: string
 }
 
-const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString('pt-BR') : '—')
-const fmtDateTime = (v: string | null) => (v ? new Date(v).toLocaleString('pt-BR') : '—')
+const fmtDate = (v: string | null) => (v ? formatDate(v) : '—')
+const fmtDateTime = (v: string | null) => (v ? formatDateTime(v) : '—')
 const daysUntil = (v: string) => Math.floor((new Date(v).getTime() - Date.now()) / 86_400_000)
 
 const KEY_LABEL = { ec256: 'ECDSA P-256', rsa2048: 'RSA 2048' }
 
 function StatusBadge({ c }: { c: AcmeCert }) {
+  const { t } = useTranslation()
   if (c.status === 'issuing')
     return (
       <Badge color="indigo" variant="light" leftSection={<Loader size={10} color="indigo" />}>
-        emitindo
+        {t('certs.status_issuing')}
       </Badge>
     )
   if (c.status === 'error')
     return (
       <Badge color="red" variant="light" leftSection={<IconX size={12} />}>
-        falhou
+        {t('certs.status_failed')}
       </Badge>
     )
   if (c.status === 'pending')
     return (
       <Badge color="gray" variant="light">
-        aguardando
+        {t('certs.status_pending')}
       </Badge>
     )
   const days = c.not_after ? daysUntil(c.not_after) : 0
   if (days < 0)
     return (
       <Badge color="red" variant="light">
-        vencido
+        {t('certs.status_expired')}
       </Badge>
     )
   return (
     <Badge color={days < 30 ? 'orange' : 'teal'} variant="light" leftSection={<IconCheck size={12} />}>
-      válido
+      {t('certs.status_valid')}
     </Badge>
   )
 }
@@ -146,9 +153,9 @@ function LogTimeline({ log }: { log: LogEntry[] }) {
             )
           }
         >
-          <Text size="sm">{e.message}</Text>
+          <Text size="sm">{serverText(e)}</Text>
           <Text size="xs" c="dimmed">
-            {new Date(e.ts).toLocaleTimeString('pt-BR')}
+            {formatTime(e.ts)}
           </Text>
         </Timeline.Item>
       ))}
@@ -182,6 +189,7 @@ function CertCard({
   onDelete: () => void
   onLog: () => void
 }) {
+  const { t } = useTranslation()
   const days = c.not_after ? daysUntil(c.not_after) : null
   const total =
     c.not_before && c.not_after ? (new Date(c.not_after).getTime() - new Date(c.not_before).getTime()) / 86_400_000 : 90
@@ -211,7 +219,7 @@ function CertCard({
                 </Badge>
               )}
               {c.environment === 'staging' && (
-                <Tooltip label="Emitido pelo ambiente de testes: navegadores não confiam neste certificado">
+                <Tooltip label={t('certs.staging_tooltip')}>
                   <Badge size="xs" color="orange" variant="filled">
                     staging
                   </Badge>
@@ -225,13 +233,13 @@ function CertCard({
           {admin && (
             <Menu position="bottom-end" shadow="md" width={200}>
               <Menu.Target>
-                <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                <ActionIcon variant="subtle" color="gray" aria-label={t('page.actions')}>
                   <IconDots size={18} />
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Item leftSection={<IconListDetails size={16} />} onClick={onLog}>
-                  Ver registro da emissão
+                  {t('certs.view_log')}
                 </Menu.Item>
                 <Menu.Divider />
                 <Menu.Item
@@ -240,7 +248,7 @@ function CertCard({
                   onClick={onDelete}
                   disabled={c.status === 'issuing'}
                 >
-                  Remover
+                  {t('certs.remove')}
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
@@ -252,10 +260,10 @@ function CertCard({
         <div style={{ marginTop: 16 }}>
           <Group justify="space-between" mb={4}>
             <Text size="xs" c="dimmed">
-              Válido até {fmtDate(c.not_after)}
+              {t('certs.valid_until', { date: fmtDate(c.not_after) })}
             </Text>
             <Text size="xs" fw={600} c={color}>
-              {days < 0 ? 'vencido' : `${days} dias restantes`}
+              {days < 0 ? t('certs.status_expired') : t('certs.days_left', { count: days })}
             </Text>
           </Group>
           <Progress value={Math.max(2, Math.min(100, (days / total) * 100))} color={color} size="sm" radius="xl" />
@@ -274,29 +282,29 @@ function CertCard({
           variant="light"
           mt="md"
           icon={<IconAlertCircle size={16} />}
-          title={`Falha na emissão${c.failures > 1 ? ` (${c.failures}ª tentativa)` : ''}`}
+          title={c.failures > 1 ? t('certs.issue_failed_attempt', { n: c.failures }) : t('certs.issue_failed')}
         >
           <Text size="sm" style={{ wordBreak: 'break-word' }}>
             {c.last_error}
           </Text>
           {c.next_attempt_at && (
             <Text size="xs" c="dimmed" mt={4}>
-              Nova tentativa automática em {fmtDateTime(c.next_attempt_at)}
+              {t('certs.next_attempt', { date: fmtDateTime(c.next_attempt_at) })}
             </Text>
           )}
         </Alert>
       )}
 
       <SimpleGrid cols={{ base: 2, sm: 3 }} mt="md" spacing="sm" verticalSpacing="sm">
-        <Info label="SSL no APISIX">
+        <Info label={t('certs.info_ssl')}>
           <Anchor component={Link} to="/r/ssls" size="sm" ff="monospace">
             {c.ssl_id}
           </Anchor>
         </Info>
-        <Info label="Renovação">{c.renew_at ? fmtDate(c.renew_at) : 'após a emissão'}</Info>
-        <Info label="Chave">{KEY_LABEL[c.key_type]}</Info>
-        <Info label="Emissor">{c.issuer || '—'}</Info>
-        <Info label="Última emissão">{fmtDateTime(c.issued_at)}</Info>
+        <Info label={t('certs.info_renewal')}>{c.renew_at ? fmtDate(c.renew_at) : t('certs.after_issuance')}</Info>
+        <Info label={t('certs.info_key')}>{KEY_LABEL[c.key_type]}</Info>
+        <Info label={t('certs.info_issuer')}>{c.issuer || '—'}</Info>
+        <Info label={t('certs.info_last_issued')}>{fmtDateTime(c.issued_at)}</Info>
         <Info label="SHA-256">
           {c.fingerprint ? (
             <Tooltip label={c.fingerprint} maw={360} multiline>
@@ -311,7 +319,7 @@ function CertCard({
       {admin && (
         <Group justify="flex-end" mt="md" gap="xs">
           <Button size="xs" variant="default" leftSection={<IconListDetails size={14} />} onClick={onLog}>
-            Registro
+            {t('certs.log')}
           </Button>
           <Button
             size="xs"
@@ -320,7 +328,7 @@ function CertCard({
             onClick={onIssue}
             loading={c.status === 'issuing'}
           >
-            {c.status === 'valid' ? 'Renovar agora' : 'Emitir agora'}
+            {c.status === 'valid' ? t('certs.renew_now') : t('certs.issue_now')}
           </Button>
         </Group>
       )}
@@ -329,6 +337,7 @@ function CertCard({
 }
 
 function ProviderCard({ info }: { info: AcmeInfo }) {
+  const { t } = useTranslation()
   const q = useQuery({
     queryKey: ['acme', 'provider'],
     queryFn: () => api<Provider>('GET', '/api/acme/provider'),
@@ -342,10 +351,10 @@ function ProviderCard({ info }: { info: AcmeInfo }) {
             <IconCloud size={22} stroke={1.6} />
           </ThemeIcon>
           <div>
-            <Text fw={700}>Let's Encrypt · DNS-01 via Cloudflare</Text>
+            <Text fw={700}>{t('certs.provider_title')}</Text>
             <Text size="sm" c="dimmed">
-              Renova {info.renew_before_days} dias antes do vencimento
-              {info.email ? ` · conta ${info.email}` : ' · sem e-mail de contato'}
+              {t('certs.renews_before', { days: info.renew_before_days })}
+              {info.email ? t('certs.account', { email: info.email }) : t('certs.no_email')}
             </Text>
           </div>
         </Group>
@@ -353,27 +362,27 @@ function ProviderCard({ info }: { info: AcmeInfo }) {
           <Skeleton h={22} w={110} />
         ) : q.data?.token_ok ? (
           <Badge color="teal" variant="light" leftSection={<IconCircleCheck size={12} />}>
-            token válido
+            {t('certs.token_ok')}
           </Badge>
         ) : (
           <Badge color="red" variant="light">
-            token inválido
+            {t('certs.token_bad')}
           </Badge>
         )}
       </Group>
       {q.data?.error && (
         <Alert color="red" variant="light" mt="md" icon={<IconAlertCircle size={16} />}>
-          {q.data.error}
+          {serverText({ code: q.data.code, params: q.data.params, message: q.data.error })}
         </Alert>
       )}
       {q.data?.token_ok && (
         <Group gap={6} mt="md">
           <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-            Zonas acessíveis
+            {t('certs.zones')}
           </Text>
           {q.data.zones.length === 0 ? (
             <Text size="sm" c="dimmed">
-              nenhuma: dê ao token permissão Zone:DNS:Edit
+              {t('certs.no_zones')}
             </Text>
           ) : (
             q.data.zones.map((z) => (
@@ -389,25 +398,23 @@ function ProviderCard({ info }: { info: AcmeInfo }) {
 }
 
 function SetupHelp() {
+  const { t } = useTranslation()
   return (
     <Card>
-      <EmptyState
-        icon={IconCertificate2}
-        title="Emissão automática desativada"
-        description="A dashboard emite e renova certificados Let's Encrypt pelo desafio DNS na Cloudflare e publica no APISIX, sem reload. Para ativar, configure o serviço:"
-      />
+      <EmptyState icon={IconCertificate2} title={t('certs.disabled_title')} description={t('certs.disabled_desc')} />
       <Code block mx="auto" maw={640}>
         {`DASH_ACME_CLOUDFLARE_API_TOKEN_FILE=/run/secrets/cloudflare_token
-DASH_ACME_EMAIL=infra@exemplo.com.br   # opcional`}
+DASH_ACME_EMAIL=infra@example.com   # ${t('certs.optional')}`}
       </Code>
       <Text size="xs" c="dimmed" ta="center" mt="sm" mb="md">
-        Crie o token na Cloudflare com permissão <b>Zone · DNS · Edit</b> apenas nas zonas usadas.
+        <Trans i18nKey="certs.token_hint" components={{ b: <b /> }} />
       </Text>
     </Card>
   )
 }
 
 function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: () => void; existing: AcmeCert[] }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [domains, setDomains] = useState<string[]>([])
   const [env, setEnv] = useState('production')
@@ -452,8 +459,8 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
       notifications.show({
         color: 'indigo',
         icon: <IconClockHour4 size={18} />,
-        title: 'Emissão iniciada',
-        message: 'Acompanhe o progresso no card do certificado.',
+        title: t('certs.issue_started'),
+        message: t('certs.issue_started_desc'),
       })
       void qc.invalidateQueries({ queryKey: ['acme'] })
       close()
@@ -472,13 +479,13 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
   }
 
   return (
-    <Modal opened={opened} onClose={close} size="lg" title={<Text fw={700}>Novo certificado automático</Text>}>
+    <Modal opened={opened} onClose={close} size="lg" title={<Text fw={700}>{t('certs.new_title')}</Text>}>
       <Stack>
         <TagsInput
-          label="Domínios"
+          label={t('certs.domains')}
           withAsterisk
-          description="Digite e tecle Enter. Wildcard é suportado: *.exemplo.com.br"
-          placeholder="exemplo.com.br"
+          description={t('certs.domains_hint')}
+          placeholder={t('certs.domains_placeholder')}
           value={domains}
           onChange={setDomains}
           splitChars={[',', ' ']}
@@ -486,37 +493,35 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
         />
         <div>
           <Text size="sm" fw={500} mb={4}>
-            Ambiente
+            {t('certs.environment')}
           </Text>
           <SegmentedControl
             fullWidth
             value={env}
             onChange={setEnv}
             data={[
-              { value: 'production', label: 'Produção' },
-              { value: 'staging', label: 'Staging (teste)' },
+              { value: 'production', label: t('certs.env_production') },
+              { value: 'staging', label: t('certs.env_staging') },
             ]}
           />
           <Text size="xs" c="dimmed" mt={4}>
-            {env === 'staging'
-              ? "Ambiente de testes do Let's Encrypt: valida todo o fluxo sem consumir os limites, mas o certificado não é confiável."
-              : 'Certificado confiável pelos navegadores. Use staging antes se estiver testando.'}
+            {env === 'staging' ? t('certs.env_staging_hint') : t('certs.env_production_hint')}
           </Text>
         </div>
         <Group grow align="flex-start">
           <Select
-            label="Tipo de chave"
+            label={t('certs.key_type')}
             value={keyType}
             onChange={(v) => setKeyType(v ?? 'ec256')}
             allowDeselect={false}
             data={[
-              { value: 'ec256', label: 'ECDSA P-256 (recomendado)' },
-              { value: 'rsa2048', label: 'RSA 2048 (clientes antigos)' },
+              { value: 'ec256', label: t('certs.key_ec256') },
+              { value: 'rsa2048', label: t('certs.key_rsa2048') },
             ]}
           />
           <TextInput
-            label="ID do SSL no APISIX"
-            placeholder={defaultId || 'gerado a partir do domínio'}
+            label={t('certs.ssl_id')}
+            placeholder={defaultId || t('certs.ssl_id_placeholder')}
             value={sslId}
             onChange={(e) => setSslId(e.currentTarget.value)}
           />
@@ -527,11 +532,9 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
             color="red"
             variant="light"
             icon={<IconAlertCircle size={16} />}
-            title={`O SSL ${effectiveId} já é emitido automaticamente`}
+            title={t('certs.already_managed', { id: effectiveId })}
           >
-            <Text size="sm">
-              Escolha outro ID, ou edite os domínios removendo e cadastrando o certificado existente.
-            </Text>
+            <Text size="sm">{t('certs.already_managed_hint')}</Text>
           </Alert>
         )}
         {sameId && (
@@ -539,30 +542,21 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
             color="orange"
             variant="light"
             icon={<IconAlertTriangle size={16} />}
-            title={`Já existe o SSL ${effectiveId}`}
+            title={t('certs.exists', { id: effectiveId })}
           >
-            <Text size="sm">
-              Ele continua servindo o tráfego até o novo certificado ser emitido e só então é substituído. Use isso para
-              migrar um certificado gerenciado manualmente.
-            </Text>
+            <Text size="sm">{t('certs.exists_hint')}</Text>
             <Checkbox
               mt="sm"
-              label="Substituir o SSL existente"
+              label={t('certs.replace')}
               checked={replace}
               onChange={(e) => setReplace(e.currentTarget.checked)}
             />
           </Alert>
         )}
         {overlapping.length > 0 && (
-          <Alert
-            color="yellow"
-            variant="light"
-            icon={<IconInfoCircle size={16} />}
-            title="SNIs já atendidos por outro SSL"
-          >
+          <Alert color="yellow" variant="light" icon={<IconInfoCircle size={16} />} title={t('certs.overlap_title')}>
             <Text size="sm">
-              {overlapping.map((o) => o.id).join(', ')} também responde por {domains.join(', ')}. Depois da emissão,
-              exclua o SSL antigo para o APISIX usar apenas o novo.
+              {t('certs.overlap_hint', { ids: overlapping.map((o) => o.id).join(', '), domains: domains.join(', ') })}
             </Text>
           </Alert>
         )}
@@ -572,19 +566,18 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
           </Alert>
         )}
         <Text size="xs" c="dimmed">
-          Ao emitir, você aceita os termos de uso do Let's Encrypt. A chave privada é gerada aqui, enviada ao APISIX e
-          nunca armazenada pela dashboard.
+          {t('certs.terms')}
         </Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={close}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={() => create.mutate()}
             loading={create.isPending}
             disabled={domains.length === 0 || alreadyManaged || (sameId && !replace)}
           >
-            Emitir certificado
+            {t('certs.issue')}
           </Button>
         </Group>
       </Stack>
@@ -593,6 +586,7 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
 }
 
 export function Certificates() {
+  const { t } = useTranslation()
   const { me } = useAuth()
   const admin = isAdmin(me.role)
   const qc = useQueryClient()
@@ -615,7 +609,7 @@ export function Certificates() {
   const issue = useMutation({
     mutationFn: (id: number) => api('POST', `/api/acme/certificates/${id}/issue`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['acme'] }),
-    onError: (e) => notifications.show({ color: 'red', title: 'Não foi possível iniciar', message: e.message }),
+    onError: (e) => notifications.show({ color: 'red', title: t('certs.start_failed'), message: e.message }),
   })
   const remove = useMutation({
     mutationFn: ({ id, ssl }: { id: number; ssl: boolean }) =>
@@ -625,14 +619,14 @@ export function Certificates() {
       notifications.show({
         color: 'teal',
         icon: <IconCheck size={18} />,
-        title: 'Removido',
-        message: 'O certificado não será mais renovado.',
+        title: t('certs.removed'),
+        message: t('certs.removed_desc'),
       })
       void qc.invalidateQueries({ queryKey: ['acme'] })
       void qc.invalidateQueries({ queryKey: ['apisix', 'ssls'] })
       setDeleting(null)
     },
-    onError: (e) => notifications.show({ color: 'red', title: 'Falha ao remover', message: e.message }),
+    onError: (e) => notifications.show({ color: 'red', title: t('certs.remove_failed'), message: e.message }),
   })
 
   // Refresh the SSL list once an issuance finishes.
@@ -647,8 +641,8 @@ export function Certificates() {
     <>
       <PageHeader
         icon={IconCertificate2}
-        title="Certificados automáticos"
-        description="Emissão e renovação Let's Encrypt pelo desafio DNS, publicadas no APISIX sem reload"
+        title={t('certs.title')}
+        description={t('certs.description')}
         badge={
           q.data?.enabled && (
             <Badge variant="light" size="lg" radius="xl">
@@ -660,7 +654,7 @@ export function Certificates() {
           admin &&
           q.data?.enabled && (
             <Button leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
-              Novo certificado
+              {t('certs.new')}
             </Button>
           )
         }
@@ -669,7 +663,7 @@ export function Certificates() {
       {q.isPending ? (
         <Skeleton h={160} />
       ) : q.error ? (
-        <Alert color="red" icon={<IconAlertCircle size={16} />} title="Erro ao carregar">
+        <Alert color="red" icon={<IconAlertCircle size={16} />} title={t('common.load_error')}>
           {q.error.message}
         </Alert>
       ) : !q.data?.enabled ? (
@@ -681,12 +675,12 @@ export function Certificates() {
             <Card>
               <EmptyState
                 icon={IconCertificate2}
-                title="Nenhum certificado automático"
-                description="Cadastre os domínios: a dashboard cria o TXT na Cloudflare, valida, emite e publica no APISIX. A renovação é automática."
+                title={t('certs.empty')}
+                description={t('certs.empty_desc')}
                 action={
                   admin && (
                     <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setCreating(true)}>
-                      Emitir o primeiro
+                      {t('certs.issue_first')}
                     </Button>
                   )
                 }
@@ -717,7 +711,7 @@ export function Certificates() {
       <Modal
         opened={!!logCert}
         onClose={() => setLogOf(null)}
-        title={<Text fw={700}>Registro da última emissão</Text>}
+        title={<Text fw={700}>{t('certs.last_log')}</Text>}
         size="lg"
       >
         {logCert && (
@@ -725,7 +719,7 @@ export function Certificates() {
             <Text size="sm" c="dimmed">
               {logCert.domains.join(', ')}
             </Text>
-            {logCert.log.length ? <LogTimeline log={logCert.log} /> : <Text size="sm">Ainda não houve emissão.</Text>}
+            {logCert.log.length ? <LogTimeline log={logCert.log} /> : <Text size="sm">{t('certs.no_issuance')}</Text>}
           </Stack>
         )}
       </Modal>
@@ -733,23 +727,27 @@ export function Certificates() {
       <Modal
         opened={!!deleting}
         onClose={() => setDeleting(null)}
-        title={<Text fw={700}>Remover certificado automático</Text>}
+        title={<Text fw={700}>{t('certs.remove_title')}</Text>}
       >
         {deleting && (
           <Stack>
             <Text size="sm">
-              <b>{deleting.domains.join(', ')}</b> deixará de ser renovado.
+              <Trans
+                i18nKey="certs.remove_confirm"
+                values={{ domains: deleting.domains.join(', ') }}
+                components={{ b: <b /> }}
+              />
             </Text>
             <Checkbox
-              label={`Excluir também o SSL ${deleting.ssl_id} do APISIX`}
-              description="Sem isso, o certificado atual continua sendo servido até vencer e passa a ser editável como um SSL comum."
+              label={t('certs.delete_ssl', { id: deleting.ssl_id })}
+              description={t('certs.delete_ssl_hint')}
               checked={deleteSSL}
               onChange={(e) => setDeleteSSL(e.currentTarget.checked)}
               color="red"
             />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setDeleting(null)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
               <Button
                 color="red"
@@ -757,7 +755,7 @@ export function Certificates() {
                 loading={remove.isPending}
                 onClick={() => remove.mutate({ id: deleting.id, ssl: deleteSSL })}
               >
-                Remover
+                {t('certs.remove')}
               </Button>
             </Group>
           </Stack>

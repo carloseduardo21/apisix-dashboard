@@ -25,6 +25,7 @@ import { KeyValueEditor } from '../../schema/SchemaForm'
 import { useCatalog } from '../../schema/types'
 import type { PluginRule, Settings } from './types'
 import { errorMessage, stringRecord } from '../../values'
+import { Trans, useTranslation } from 'react-i18next'
 
 function Choice<T extends string>({
   label,
@@ -53,10 +54,26 @@ function Choice<T extends string>({
 }
 
 const TEMPLATE_EXAMPLE = `{
-  "nivel": "\${config.nivel}",
-  "limite": "\${config.limite|10}",
-  "rota": "\${apisix.route_id}"
+  "level": "\${config.level}",
+  "limit": "\${config.limit|10}",
+  "route": "\${apisix.route_id}"
 }`
+
+// Template syntax samples rendered inside the translated help text.
+const code = (s: string) => <Code>{s}</Code>
+const TEMPLATE_HELP_PARTS = {
+  field: code('${config.field}'),
+  fielddefault: code('${config.field|default}'),
+  config: code('${config}'),
+  plugin: code('plugin'),
+  service: code('service'),
+  route: code('route'),
+  consumer: code('consumer'),
+  rid: code('apisix.route_id'),
+  sid: code('apisix.service_id'),
+  uid: code('apisix.upstream_id'),
+  cid: code('apisix.consumer'),
+}
 
 function RuleEditor({
   rule,
@@ -71,6 +88,7 @@ function RuleEditor({
   kongPlugins: string[]
   apisixPlugins: string[]
 }) {
+  const { t } = useTranslation()
   // The template is edited as text and only parsed when valid.
   const [text, setText] = useState(() => (rule.template ? JSON.stringify(rule.template, null, 2) : ''))
   const [error, setError] = useState('')
@@ -82,10 +100,10 @@ function RuleEditor({
       return
     }
     try {
-      const t = JSON.parse(v)
-      if (!t || typeof t !== 'object' || Array.isArray(t)) throw new Error('o template deve ser um objeto')
+      const tpl = JSON.parse(v)
+      if (!tpl || typeof tpl !== 'object' || Array.isArray(tpl)) throw new Error(t('kong.set.template_not_object'))
       setError('')
-      onChange({ ...rule, template: t })
+      onChange({ ...rule, template: tpl })
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -94,8 +112,8 @@ function RuleEditor({
     <Card withBorder padding="md">
       <Group align="flex-end" wrap="wrap" gap="sm">
         <Autocomplete
-          label="Plugin do Kong"
-          placeholder="meu-plugin"
+          label={t('kong.set.kong_plugin')}
+          placeholder="my-plugin"
           data={kongPlugins}
           value={rule.kong_plugin}
           onChange={(v) => onChange({ ...rule, kong_plugin: v.trim() })}
@@ -105,16 +123,16 @@ function RuleEditor({
           value={rule.action}
           onChange={(v) => onChange({ ...rule, action: v })}
           data={[
-            { value: 'map', label: 'Mapear' },
-            { value: 'ignore', label: 'Ignorar' },
+            { value: 'map', label: t('kong.set.map') },
+            { value: 'ignore', label: t('kong.set.ignore') },
           ]}
         />
         {rule.action === 'map' && (
           <>
             <IconArrowRight size={18} style={{ marginBottom: 8 }} />
             <Autocomplete
-              label="Plugin do APISIX"
-              placeholder="meu-plugin-apisix"
+              label={t('kong.set.apisix_plugin')}
+              placeholder="my-apisix-plugin"
               data={apisixPlugins}
               value={rule.apisix_plugin ?? ''}
               onChange={(v) => onChange({ ...rule, apisix_plugin: v.trim() })}
@@ -122,15 +140,22 @@ function RuleEditor({
             />
           </>
         )}
-        <ActionIcon variant="subtle" color="red" size="lg" onClick={onRemove} aria-label="Remover regra" mb={2}>
+        <ActionIcon
+          variant="subtle"
+          color="red"
+          size="lg"
+          onClick={onRemove}
+          aria-label={t('kong.set.remove_rule')}
+          mb={2}
+        >
           <IconTrash size={18} />
         </ActionIcon>
       </Group>
       {rule.action === 'map' && (
         <JsonInput
           mt="sm"
-          label="Template da configuração"
-          description="Objeto JSON gerado para cada ocorrência do plugin. Campos com valor ausente são omitidos."
+          label={t('kong.set.template')}
+          description={t('kong.set.template_hint')}
           placeholder={TEMPLATE_EXAMPLE}
           value={text}
           onChange={parse}
@@ -148,6 +173,7 @@ function RuleEditor({
 
 /** Migration defaults, applied to every step. */
 export function SettingsForm({ settings, kongPlugins }: { settings: Settings; kongPlugins: string[] }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const catalog = useCatalog()
   const [draft, setDraft] = useState<Settings>(settings)
@@ -179,71 +205,71 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
       notifications.show({
         color: 'teal',
         icon: <IconCheck size={18} />,
-        title: 'Padrões salvos',
-        message: 'O inventário foi recalculado com os novos padrões.',
+        title: t('kong.set.saved_title'),
+        message: t('kong.set.saved'),
       })
       void qc.invalidateQueries({ queryKey: ['kong'] })
     },
     onError: (e) => setError(e.message),
   })
 
-  const exampleId = `${draft.id_prefix}${draft.id_strategy === 'name' ? 'pagamentos-api' : '5d34560d-8c3c-…'}`
+  const exampleId = `${draft.id_prefix}${draft.id_strategy === 'name' ? 'payments-api' : '5d34560d-8c3c-…'}`
 
   return (
     <Stack>
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Card>
           <Title order={4} mb="md">
-            Identificação
+            {t('kong.set.identification')}
           </Title>
           <Stack>
             <Choice
-              label="ID no APISIX"
-              description="Pelo nome os IDs ficam legíveis; pelo ID do Kong não mudam se algo for renomeado."
+              label={t('kong.set.id_label')}
+              description={t('kong.set.id_hint')}
               value={draft.id_strategy}
               onChange={(v) => set('id_strategy', v)}
               data={[
-                { value: 'name', label: 'Nome do Kong' },
-                { value: 'kong_id', label: 'ID do Kong' },
+                { value: 'name', label: t('kong.set.id_name') },
+                { value: 'kong_id', label: t('kong.set.id_kong') },
               ]}
             />
             <TextInput
-              label="Prefixo dos IDs"
-              description="Aplicado a rotas, services, upstreams e plugins globais. Usernames de consumers não mudam."
+              label={t('kong.set.prefix')}
+              description={t('kong.set.prefix_hint')}
               placeholder="kong-"
               maxLength={20}
               value={draft.id_prefix}
               onChange={(e) => set('id_prefix', e.currentTarget.value)}
             />
             <Text size="xs" c="dimmed">
-              Exemplo: <Code>{exampleId}</Code>
+              {t('kong.set.example')} <Code>{exampleId}</Code>
             </Text>
           </Stack>
         </Card>
 
         <Card>
           <Title order={4} mb="md">
-            Comportamento
+            {t('kong.set.behavior')}
           </Title>
           <Stack>
             <Choice
-              label="Rotas criadas"
-              description="Desabilitadas, as rotas só passam a atender quando ativadas no cutover."
+              label={t('kong.set.routes_created')}
+              description={t('kong.set.routes_created_hint')}
               value={draft.route_status}
               onChange={(v) => set('route_status', v)}
               data={[
-                { value: 'disabled', label: 'Desabilitadas' },
-                { value: 'enabled', label: 'Habilitadas' },
+                { value: 'disabled', label: t('kong.set.disabled') },
+                { value: 'enabled', label: t('kong.set.enabled') },
               ]}
             />
             <Choice
-              label="Objeto com o mesmo ID no APISIX"
-              description="Vale para objetos que não vieram desta migração."
+              label={t('kong.set.same_id')}
+              description={t('kong.set.same_id_hint')}
               value={draft.on_conflict}
               onChange={(v) => set('on_conflict', v)}
               data={[
-                { value: 'skip', label: 'Pular' },
-                { value: 'overwrite', label: 'Sobrescrever' },
+                { value: 'skip', label: t('kong.set.skip') },
+                { value: 'overwrite', label: t('kong.set.overwrite') },
               ]}
             />
           </Stack>
@@ -251,32 +277,32 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
 
         <Card>
           <Title order={4} mb="md">
-            Plugins
+            {t('kong.set.plugins')}
           </Title>
           <Stack>
             <Choice
-              label="Plugin sem tradução"
-              description="Bloquear evita publicar uma rota sem, por exemplo, a autenticação."
+              label={t('kong.set.untranslated')}
+              description={t('kong.set.untranslated_hint')}
               value={draft.unsupported_plugins}
               onChange={(v) => set('unsupported_plugins', v)}
               data={[
-                { value: 'block', label: 'Bloquear o objeto' },
-                { value: 'skip', label: 'Migrar sem o plugin' },
+                { value: 'block', label: t('kong.set.block_object') },
+                { value: 'skip', label: t('kong.set.migrate_without') },
               ]}
             />
             <Choice
-              label="Plugin desabilitado no Kong"
-              description="Migrar desabilitado usa _meta.disable no APISIX."
+              label={t('kong.set.disabled_plugin')}
+              description={t('kong.set.disabled_plugin_hint')}
               value={draft.disabled_plugins}
               onChange={(v) => set('disabled_plugins', v)}
               data={[
-                { value: 'skip', label: 'Ignorar' },
-                { value: 'keep', label: 'Migrar desabilitado' },
+                { value: 'skip', label: t('kong.set.ignore') },
+                { value: 'keep', label: t('kong.set.migrate_disabled') },
               ]}
             />
             <Switch
-              label="Habilitar WebSocket nas rotas"
-              description="O Kong aceita upgrade para WebSocket em qualquer rota HTTP; o APISIX só com enable_websocket."
+              label={t('kong.set.websocket')}
+              description={t('kong.set.websocket_hint')}
               checked={draft.enable_websocket}
               onChange={(e) => set('enable_websocket', e.currentTarget.checked)}
             />
@@ -285,18 +311,17 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
 
         <Card>
           <Title order={4} mb={4}>
-            Reescrita de hosts
+            {t('kong.set.host_rewrites')}
           </Title>
           <Text size="xs" c="dimmed" mb="md">
-            Troca o host de services e targets, por exemplo pelo nome do serviço no Swarm. O header Host enviado
-            continua o original.
+            {t('kong.set.host_rewrites_hint')}
           </Text>
           <Stack gap={6}>
             {draft.host_rewrites.map((h, i) => (
               // oxlint-disable-next-line react/no-array-index-key -- rows have no identity and every input is controlled
               <Group key={i} gap="xs" wrap="nowrap">
                 <TextInput
-                  placeholder="pagamentos.interno"
+                  placeholder="payments.internal"
                   value={h.from}
                   style={{ flex: 1 }}
                   onChange={(e) =>
@@ -308,7 +333,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
                 />
                 <IconArrowRight size={16} style={{ flexShrink: 0 }} />
                 <TextInput
-                  placeholder="pagamentos_api:8080"
+                  placeholder="payments_api:8080"
                   value={h.to}
                   style={{ flex: 1 }}
                   onChange={(e) =>
@@ -327,7 +352,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
                       draft.host_rewrites.filter((_, j) => j !== i),
                     )
                   }
-                  aria-label="Remover"
+                  aria-label={t('common.remove')}
                 >
                   <IconTrash size={16} />
                 </ActionIcon>
@@ -340,23 +365,23 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
               leftSection={<IconPlus size={14} />}
               onClick={() => set('host_rewrites', [...draft.host_rewrites, { from: '', to: '' }])}
             >
-              Adicionar
+              {t('common.add')}
             </Button>
           </Stack>
           <Title order={4} mt="lg" mb={4}>
-            Labels extras
+            {t('kong.set.extra_labels')}
           </Title>
           <KeyValueEditor
             key={version}
             description={
               <>
-                Somados a <Code>migrated-from=kong</Code> e <Code>kong-id</Code>, que a migração já grava.
+                <Trans i18nKey="kong.set.extra_labels_hint" components={{ code: <Code /> }} />
               </>
             }
             value={draft.labels}
             onChange={(v) => set('labels', stringRecord(v))}
-            keyPlaceholder="lote"
-            valuePlaceholder="onda-1"
+            keyPlaceholder={t('kong.set.label_key')}
+            valuePlaceholder={t('kong.set.label_value')}
           />
         </Card>
       </SimpleGrid>
@@ -364,10 +389,9 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
       <Card>
         <Group justify="space-between" align="flex-start" mb="md">
           <div>
-            <Title order={4}>Regras de plugins</Title>
+            <Title order={4}>{t('kong.set.rules')}</Title>
             <Text size="sm" c="dimmed" maw={760}>
-              Para plugins custom (ou para trocar a tradução padrão). A regra vale para todas as ocorrências do plugin:
-              services, rotas, consumers e globais.
+              {t('kong.set.rules_hint')}
             </Text>
           </div>
           <Button
@@ -382,22 +406,18 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
               setNextRuleKey((n) => n + 1)
             }}
           >
-            Nova regra
+            {t('kong.set.new_rule')}
           </Button>
         </Group>
-        <Alert variant="light" color="indigo" mb="md" title="Como escrever o template">
+        <Alert variant="light" color="indigo" mb="md" title={t('kong.set.template_help_title')}>
           <Text size="sm">
-            <Code>{'${config.campo}'}</Code> copia o valor do plugin no Kong mantendo o tipo;{' '}
-            <Code>{'${config.campo|padrão}'}</Code> usa o padrão quando ausente; <Code>{'${config}'}</Code> copia a
-            configuração inteira. Também existem <Code>plugin</Code>, <Code>service</Code>, <Code>route</Code>,{' '}
-            <Code>consumer</Code> (objetos do Kong) e <Code>apisix.route_id</Code>, <Code>apisix.service_id</Code>,{' '}
-            <Code>apisix.upstream_id</Code>, <Code>apisix.consumer</Code>.
+            <Trans i18nKey="kong.set.template_help" components={TEMPLATE_HELP_PARTS} />
           </Text>
         </Alert>
         <Stack>
           {draft.plugin_rules.length === 0 && (
             <Text size="sm" c="dimmed">
-              Nenhuma regra. Plugins sem tradução automática aparecem no inventário como bloqueados.
+              {t('kong.set.no_rules')}
             </Text>
           )}
           {draft.plugin_rules.map((r, i) => (
@@ -429,7 +449,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           color="red"
           variant="light"
           icon={<IconAlertCircle size={16} />}
-          title="Não foi possível salvar"
+          title={t('common.save_error')}
           style={{ whiteSpace: 'pre-line' }}
         >
           {error}
@@ -438,11 +458,11 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
       <Group justify="flex-end">
         {dirty && (
           <Badge color="orange" variant="light">
-            alterações não salvas
+            {t('kong.set.unsaved')}
           </Badge>
         )}
         <Button variant="default" disabled={!dirty} onClick={() => setDraft(settings)}>
-          Descartar
+          {t('kong.set.discard')}
         </Button>
         <Button
           leftSection={<IconDeviceFloppy size={16} />}
@@ -450,7 +470,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           loading={save.isPending}
           onClick={() => save.mutate()}
         >
-          Salvar padrões
+          {t('kong.set.save')}
         </Button>
       </Group>
     </Stack>

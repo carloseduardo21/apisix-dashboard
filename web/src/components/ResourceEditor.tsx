@@ -17,6 +17,7 @@ import { FORMS } from '../forms/forms'
 import type { Obj } from '../schema/types'
 import type { ResourceDef } from '../resources'
 import { errorMessage } from '../values'
+import { Trans, useTranslation } from 'react-i18next'
 
 interface Props {
   def: ResourceDef
@@ -31,6 +32,9 @@ const MASK_RE = /"\*{6}"/
 
 /** Form + JSON editor; both tabs edit the same object. */
 export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Props) {
+  const { t } = useTranslation()
+  const name = t(`resources.${def.key}.singular`)
+  const context = t(`resources.${def.key}.gender`)
   const Form = FORMS[def.key]
   const isNew = !editing
   const [draft, setDraft] = useState<Obj>({})
@@ -59,10 +63,10 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
   const parseText = (): Obj | undefined => {
     try {
       const v = JSON.parse(text)
-      if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('o conteúdo deve ser um objeto')
+      if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(t('editor.must_be_object'))
       return v
     } catch (e) {
-      setError(`JSON inválido: ${errorMessage(e)}`)
+      setError(t('editor.invalid_json', { error: errorMessage(e) }))
       return undefined
     }
   }
@@ -87,7 +91,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
     const value = tab === 'json' ? parseText() : draft
     if (!value) return
     if (isNew && idMode === 'required' && !id.trim()) {
-      setError('Informe o ID')
+      setError(t('editor.id_required'))
       return
     }
     setSaving(true)
@@ -114,11 +118,9 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
             <def.icon size={20} stroke={1.6} />
           </ThemeIcon>
           <div>
-            <Text fw={700}>
-              {editing ? `Editar ${def.singular}` : `${def.feminine ? 'Nova' : 'Novo'} ${def.singular}`}
-            </Text>
+            <Text fw={700}>{editing ? t('resources.edit', { name }) : t('resources.new', { name, context })}</Text>
             <Text size="xs" c="dimmed" ff={editing ? 'monospace' : undefined}>
-              {editing ? editing.id : def.description}
+              {editing ? editing.id : t(`resources.${def.key}.description`)}
             </Text>
           </div>
         </Group>
@@ -133,11 +135,11 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
             withAsterisk={idMode === 'required'}
             description={
               idMode === 'optional'
-                ? 'Opcional: deixe vazio para o APISIX gerar'
+                ? t('editor.id_optional')
                 : def.key === 'secrets'
-                  ? 'Formato gerenciador/id, ex.: vault/1'
+                  ? t('editor.id_secret_format')
                   : def.key === 'credentials'
-                    ? 'Letras, números, ".", "_" ou "-", ex.: app-pagamentos'
+                    ? t('editor.id_credential_format')
                     : undefined
             }
             value={id}
@@ -150,7 +152,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
           <Tabs.List>
             {Form && (
               <Tabs.Tab value="form" leftSection={<IconForms size={16} />}>
-                Formulário
+                {t('editor.form_tab')}
               </Tabs.Tab>
             )}
             <Tabs.Tab value="json" leftSection={<IconCode size={16} />}>
@@ -170,7 +172,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
               minRows={16}
               maxRows={32}
               formatOnBlur
-              validationError="JSON inválido"
+              validationError={t('editor.invalid_json_short')}
               styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 13 } }}
             />
           </Tabs.Panel>
@@ -178,7 +180,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
 
         {hasMasked && (
           <Alert color="blue" icon={<IconInfoCircle size={16} />} variant="light">
-            Valores <code>******</code> são segredos mascarados: mantidos, preservam o valor atual no APISIX.
+            <Trans i18nKey="editor.masked_hint" components={{ code: <code /> }} />
           </Alert>
         )}
         {error && (
@@ -188,10 +190,10 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
         )}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button onClick={submit} loading={saving}>
-            Salvar
+            {t('common.save')}
           </Button>
         </Group>
       </Stack>

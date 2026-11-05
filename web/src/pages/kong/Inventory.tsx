@@ -38,6 +38,8 @@ import {
 import { EmptyState } from '../../components/EmptyState'
 import { ActionBadge, NoteList, PluginBadges } from './PreviewModal'
 import { groupAction, type Action, type Plan, type PlanItem, type Selection } from './types'
+import { Trans, useTranslation } from 'react-i18next'
+import { noteText } from '../../i18n/format'
 
 type Filter = 'all' | 'pending' | 'migrated' | 'blocked'
 
@@ -66,6 +68,7 @@ function Stat({
   migrated: number
   blocked: number
 }) {
+  const { t } = useTranslation()
   return (
     <Card padding="md">
       <Group gap="sm" wrap="nowrap">
@@ -83,11 +86,11 @@ function Stat({
       </Group>
       <Group gap={6} mt="sm">
         <Badge size="sm" variant="light" color="teal">
-          {migrated} migrados
+          {t('kong.inv.migrated', { count: migrated })}
         </Badge>
         {blocked > 0 && (
           <Badge size="sm" variant="light" color="red">
-            {blocked} bloqueados
+            {t('kong.inv.blocked', { count: blocked })}
           </Badge>
         )}
       </Group>
@@ -97,7 +100,7 @@ function Stat({
 
 function Notes({ items }: { items: PlanItem[] }) {
   const notes = items.flatMap((i) =>
-    i.notes.map((n) => ({ ...n, message: items.length > 1 ? `${kindPrefix(i)}${n.message}` : n.message })),
+    i.notes.map((n) => ({ ...n, prefix: items.length > 1 ? kindPrefix(i) : undefined })),
   )
   return <NoteList notes={notes} />
 }
@@ -121,6 +124,7 @@ function ServiceRow({
   toggleService: (id: string) => void
   toggleRoute: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const all = [g.service, ...(g.upstream ? [g.upstream] : []), ...g.routes]
   const action = groupAction(all)
@@ -135,9 +139,15 @@ function ServiceRow({
           checked={svcSelected}
           indeterminate={!svcSelected && someRoutes}
           onChange={() => toggleService(g.service.kong_id)}
-          aria-label={`Selecionar ${g.service.kong_name}`}
+          aria-label={t('kong.inv.select', { name: g.service.kong_name })}
         />
-        <ActionIcon variant="subtle" color="gray" onClick={() => setOpen((o) => !o)} aria-label="Detalhes" mt={1}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={t('kong.inv.details')}
+          mt={1}
+        >
           {open ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
         </ActionIcon>
         <UnstyledButton
@@ -152,7 +162,7 @@ function ServiceRow({
                   {g.service.kong_name}
                 </Text>
                 <Badge size="xs" variant="outline" color="gray">
-                  {g.routes.length} {g.routes.length === 1 ? 'rota' : 'rotas'}
+                  {t('kong.inv.routes_count', { count: g.routes.length })}
                 </Badge>
               </Group>
               <Text size="xs" c="dimmed" ff="monospace" truncate>
@@ -162,7 +172,7 @@ function ServiceRow({
             </div>
             <Group gap={6} wrap="nowrap">
               {warn && (
-                <Tooltip label="Há avisos: abra para ver">
+                <Tooltip label={t('kong.inv.has_warnings')}>
                   <IconAlertTriangle size={16} color="var(--mantine-color-orange-6)" />
                 </Tooltip>
               )}
@@ -181,9 +191,9 @@ function ServiceRow({
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th w={36} />
-                    <Table.Th>Rota</Table.Th>
-                    <Table.Th>Plugins</Table.Th>
-                    <Table.Th w={110}>Status</Table.Th>
+                    <Table.Th>{t('kong.inv.col_route')}</Table.Th>
+                    <Table.Th>{t('columns.plugins')}</Table.Th>
+                    <Table.Th w={110}>{t('common.status')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -194,7 +204,7 @@ function ServiceRow({
                           checked={svcSelected || selection.routes.includes(r.kong_id)}
                           disabled={svcSelected}
                           onChange={() => toggleRoute(r.kong_id)}
-                          aria-label={`Selecionar ${r.kong_name}`}
+                          aria-label={t('kong.inv.select', { name: r.kong_name })}
                         />
                       </Table.Td>
                       <Table.Td>
@@ -245,6 +255,7 @@ function ItemTable({
   setMany: (ids: string[], on: boolean) => void
   label: string
 }) {
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const pages = Math.max(1, Math.ceil(items.length / PAGE))
   const shown = items.slice((Math.min(page, pages) - 1) * PAGE, Math.min(page, pages) * PAGE)
@@ -258,18 +269,18 @@ function ItemTable({
           <Table.Thead>
             <Table.Tr>
               <Table.Th w={36}>
-                <Tooltip label={`Selecionar todos os ${items.length} (filtrados)`}>
+                <Tooltip label={t('kong.inv.select_all_filtered', { count: items.length })}>
                   <Checkbox
                     checked={allOn}
                     indeterminate={!allOn && someOn}
                     onChange={() => setMany(ids, !allOn)}
-                    aria-label="Selecionar todos"
+                    aria-label={t('kong.inv.select_all')}
                   />
                 </Tooltip>
               </Table.Th>
               <Table.Th>{label}</Table.Th>
-              <Table.Th>Detalhes</Table.Th>
-              <Table.Th w={110}>Status</Table.Th>
+              <Table.Th>{t('kong.inv.details')}</Table.Th>
+              <Table.Th w={110}>{t('common.status')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -279,7 +290,7 @@ function ItemTable({
                   <Checkbox
                     checked={selected.includes(it.kong_id)}
                     onChange={() => toggle(it.kong_id)}
-                    aria-label={`Selecionar ${it.kong_name}`}
+                    aria-label={t('kong.inv.select', { name: it.kong_name })}
                   />
                 </Table.Td>
                 <Table.Td>
@@ -321,8 +332,6 @@ function ItemTable({
   )
 }
 
-const plural = (n: number, one: string, many: string) => n > 0 && `${n} ${n === 1 ? one : many}`
-
 const empty = (): Selection => ({ services: [], routes: [], consumers: [], globals: [] })
 
 const count = (items: PlanItem[]) => ({
@@ -333,6 +342,7 @@ const count = (items: PlanItem[]) => ({
 
 /** Kong configuration grouped for step-by-step selection. */
 export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Selection) => void }) {
+  const { t } = useTranslation()
   const [selection, setSelection] = useState<Selection>(empty)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
@@ -394,15 +404,19 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
   return (
     <Stack pb={nSel ? 80 : 0}>
       <SimpleGrid cols={{ base: 2, md: 4 }}>
-        <Stat icon={IconServer} label="Services" {...count(groups.map((g) => g.service))} />
-        <Stat icon={IconRoute} label="Rotas" {...count(plan.items.filter((i) => i.kind === 'route'))} />
-        <Stat icon={IconUsers} label="Consumers" {...count(consumers)} />
-        <Stat icon={IconWorld} label="Plugins globais" {...count(globals)} />
+        <Stat icon={IconServer} label={t('kong.inv.stat_services')} {...count(groups.map((g) => g.service))} />
+        <Stat
+          icon={IconRoute}
+          label={t('kong.inv.stat_routes')}
+          {...count(plan.items.filter((i) => i.kind === 'route'))}
+        />
+        <Stat icon={IconUsers} label={t('kong.inv.stat_consumers')} {...count(consumers)} />
+        <Stat icon={IconWorld} label={t('kong.inv.stat_globals')} {...count(globals)} />
       </SimpleGrid>
 
       <Group gap="sm" wrap="wrap">
         <TextInput
-          placeholder="Buscar por nome, host, path ou ID"
+          placeholder={t('kong.inv.search')}
           leftSection={<IconSearch size={16} />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
@@ -412,25 +426,24 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
           value={filter}
           onChange={(v) => setFilter(v)}
           data={[
-            { value: 'all', label: 'Todos' },
-            { value: 'pending', label: 'A migrar' },
-            { value: 'migrated', label: 'Migrados' },
-            { value: 'blocked', label: 'Bloqueados' },
+            { value: 'all', label: t('kong.inv.filter_all') },
+            { value: 'pending', label: t('kong.inv.filter_pending') },
+            { value: 'migrated', label: t('kong.inv.filter_migrated') },
+            { value: 'blocked', label: t('kong.inv.filter_blocked') },
           ]}
         />
       </Group>
 
       <Card>
         <Title order={4} mb="sm">
-          Services e rotas
+          {t('kong.inv.services_title')}
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Selecionar um service leva o upstream, os plugins e todas as rotas dele. Para migrar só algumas rotas, abra o
-          service e marque as rotas.
+          {t('kong.inv.services_hint')}
         </Text>
         <Stack gap="xs">
           {visibleGroups.length === 0 && (
-            <EmptyState icon={IconServer} title="Nenhum service" description="Nada corresponde ao filtro." />
+            <EmptyState icon={IconServer} title={t('kong.inv.no_services')} description={t('kong.inv.no_match')} />
           )}
           {visibleGroups.map((g) => (
             <ServiceRow
@@ -445,11 +458,11 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
         {visibleOrphans.length > 0 && (
           <>
             <Title order={5} mt="lg" mb="xs">
-              Rotas sem service
+              {t('kong.inv.orphan_routes')}
             </Title>
             <ItemTable
               items={visibleOrphans}
-              label="Rota"
+              label={t('kong.inv.col_route')}
               selected={selection.routes}
               toggle={(id) => toggleIn('routes', id)}
               setMany={setMany('routes')}
@@ -460,18 +473,17 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
 
       <Card>
         <Title order={4} mb="sm">
-          Consumers e credenciais
+          {t('kong.inv.consumers_title')}
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Os grupos de ACL viram o label <b>groups</b> do consumer (lido pelo plugin acl). Migre os consumers antes de
-          ativar as rotas que os autenticam.
+          <Trans i18nKey="kong.inv.consumers_hint" components={{ b: <b /> }} />
         </Text>
         {visibleConsumers.length === 0 ? (
-          <EmptyState icon={IconUsers} title="Nenhum consumer" description="Nada corresponde ao filtro." />
+          <EmptyState icon={IconUsers} title={t('kong.inv.no_consumers')} description={t('kong.inv.no_match')} />
         ) : (
           <ItemTable
             items={visibleConsumers}
-            label="Consumer"
+            label={t('kong.inv.stat_consumers')}
             selected={selection.consumers}
             toggle={(id) => toggleIn('consumers', id)}
             setMany={setMany('consumers')}
@@ -485,7 +497,10 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
                     {creds.map((x) => (
                       <Tooltip
                         key={x.kong_id}
-                        label={x.notes.find((n) => n.level !== 'info')?.message ?? x.detail ?? 'credencial'}
+                        label={(() => {
+                          const n = x.notes.find((note) => note.level !== 'info')
+                          return n ? noteText(n) : (x.detail ?? t('kong.inv.credential'))
+                        })()}
                         multiline
                         maw={320}
                       >
@@ -508,17 +523,17 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
 
       <Card>
         <Title order={4} mb="sm">
-          Plugins globais
+          {t('kong.inv.globals_title')}
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Viram global rules no APISIX e passam a valer para todas as rotas, inclusive as que ainda não vieram do Kong.
+          {t('kong.inv.globals_hint')}
         </Text>
         {visibleGlobals.length === 0 ? (
-          <EmptyState icon={IconPlugConnected} title="Nenhum plugin global" />
+          <EmptyState icon={IconPlugConnected} title={t('kong.inv.no_globals')} />
         ) : (
           <ItemTable
             items={visibleGlobals}
-            label="Plugin"
+            label={t('kong.inv.col_plugin')}
             selected={selection.globals}
             toggle={(id) => toggleIn('globals', id)}
             setMany={setMany('globals')}
@@ -532,22 +547,25 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
             <Paper shadow="lg" withBorder p="sm" mx="auto" maw={760} style={{ ...styles, width: 'calc(100% - 32px)' }}>
               <Group justify="space-between" wrap="wrap" gap="sm">
                 <Text size="sm">
-                  <b>Selecionado:</b>{' '}
-                  {[
-                    plural(selection.services.length, 'service', 'services'),
-                    plural(selection.routes.length, 'rota', 'rotas'),
-                    plural(selection.consumers.length, 'consumer', 'consumers'),
-                    plural(selection.globals.length, 'plugin global', 'plugins globais'),
-                  ]
-                    .filter(Boolean)
+                  <b>{t('kong.inv.selected')}</b>{' '}
+                  {(
+                    [
+                      [t('kong.inv.stat_services'), selection.services.length],
+                      [t('kong.inv.stat_routes'), selection.routes.length],
+                      [t('kong.inv.stat_consumers'), selection.consumers.length],
+                      [t('kong.inv.stat_globals'), selection.globals.length],
+                    ] as const
+                  )
+                    .filter(([, n]) => n > 0)
+                    .map(([label, n]) => t('kong.inv.sel_item', { label, count: n }))
                     .join(' · ')}
                 </Text>
                 <Group gap="xs">
                   <Button variant="default" size="sm" onClick={() => setSelection(empty())}>
-                    Limpar
+                    {t('kong.inv.clear')}
                   </Button>
                   <Button size="sm" leftSection={<IconEye size={16} />} onClick={() => onPreview(selection)}>
-                    Pré-visualizar
+                    {t('kong.inv.preview')}
                   </Button>
                 </Group>
               </Group>
