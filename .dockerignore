@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+bin
+data
+dist
+web/node_modules
+internal/web/dist
+.env
+.env.*
+*.pem
+*.key
+*.pid
+*.log
+*.tsbuildinfo
