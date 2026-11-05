@@ -139,7 +139,7 @@ export function KongMigration() {
 
   // Kong plugins in use, offered when writing custom rules.
   const kongPlugins = useMemo(
-    () => [...new Set((inventory.data?.items ?? []).flatMap((i) => i.plugins?.map((p) => p.kong) ?? []))].sort(),
+    () => [...new Set((inventory.data?.items ?? []).flatMap((i) => i.plugins?.map((p) => p.kong) ?? []))].toSorted(),
     [inventory.data],
   )
   const untranslated = useMemo(
@@ -150,7 +150,7 @@ export function KongMigration() {
             (i) => i.plugins?.filter((p) => p.status === 'error' && !p.custom).map((p) => p.kong) ?? [],
           ),
         ),
-      ].sort(),
+      ].toSorted(),
     [inventory.data],
   )
 

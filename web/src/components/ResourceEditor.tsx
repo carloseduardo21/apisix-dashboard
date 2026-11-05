@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Alert,
   Button,
@@ -16,6 +16,7 @@ import { IconAlertCircle, IconCode, IconForms, IconInfoCircle } from '@tabler/ic
 import { FORMS } from '../forms/forms'
 import type { Obj } from '../schema/types'
 import type { ResourceDef } from '../resources'
+import { errorMessage } from '../values'
 
 interface Props {
   def: ResourceDef
@@ -39,15 +40,20 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (!opened) return
-    const initial = editing ? editing.value : structuredClone(def.template)
-    setDraft(initial)
-    setText(JSON.stringify(initial, null, 2))
-    setTab(Form ? 'form' : 'json')
-    setId('')
-    setError('')
-  }, [opened, editing, def, Form])
+  // Start a fresh editing session whenever the dialog opens or its target changes
+  // (adjusting state on a prop change, no effect needed).
+  const [session, setSession] = useState<{ opened: boolean; editing: Props['editing']; def: Props['def'] }>()
+  if (session?.opened !== opened || session.editing !== editing || session.def !== def) {
+    setSession({ opened, editing, def })
+    if (opened) {
+      const initial = editing ? editing.value : structuredClone(def.template)
+      setDraft(initial)
+      setText(JSON.stringify(initial, null, 2))
+      setTab(Form ? 'form' : 'json')
+      setId('')
+      setError('')
+    }
+  }
 
   /** Parses the JSON tab; returns undefined (and shows the error) when invalid. */
   const parseText = (): Obj | undefined => {
@@ -56,7 +62,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
       if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('o conteúdo deve ser um objeto')
       return v
     } catch (e) {
-      setError(`JSON inválido: ${(e as Error).message}`)
+      setError(`JSON inválido: ${errorMessage(e)}`)
       return undefined
     }
   }
@@ -89,7 +95,7 @@ export function ResourceEditor({ def, opened, editing, onClose, onSubmit }: Prop
       await onSubmit(value, editing ? editing.id : id.trim())
       onClose()
     } catch (e) {
-      setError((e as Error).message)
+      setError(errorMessage(e))
     } finally {
       setSaving(false)
     }

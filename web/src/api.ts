@@ -24,7 +24,7 @@ export class ApiError extends Error {
 
 function errorMessage(status: number, data: unknown): string {
   if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>
+    const d: Record<string, unknown> = Object.fromEntries(Object.entries(data))
     if (typeof d.error === 'string') return d.error
     if (typeof d.error_msg === 'string') return d.error_msg
     if (typeof d.message === 'string') return d.message
@@ -56,6 +56,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     if (res.status === 401 && !path.startsWith('/api/auth/')) onUnauthorized?.()
     throw new ApiError(res.status, errorMessage(res.status, data), data)
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- typed contract with our own backend; callers narrow APISIX payloads
   return data as T
 }
 

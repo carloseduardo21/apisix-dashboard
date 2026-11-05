@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { Center, Loader } from '@mantine/core'
 import { api, ApiError, setCsrfToken, setUnauthorizedHandler, type Me } from './api'
 import { LoginFlow } from './pages/Login'
@@ -29,6 +29,16 @@ async function fetchMe(): Promise<Me | null> {
   }
 }
 
+/** Ends the session server-side and always clears local state (errors still propagate). */
+async function logoutAndReset(qc: QueryClient, refetch: () => Promise<unknown>): Promise<void> {
+  try {
+    await api('POST', '/api/auth/logout')
+  } finally {
+    qc.clear()
+    await refetch()
+  }
+}
+
 /** Renders the login flow until the user has a complete session. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
@@ -42,6 +52,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     })
   }, [qc, refetch])
 
+  const logout = useCallback(() => logoutAndReset(qc, refetch), [qc, refetch])
+  // Stable context value: consumers re-render only when the session changes.
+  const ctx = useMemo(() => (me ? { me, refresh: refetch, logout } : null), [me, refetch, logout])
+
   if (isPending) {
     return (
       <Center h="100vh">
@@ -54,14 +68,5 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <LoginFlow me={me ?? null} onDone={() => refetch()} />
   }
 
-  const logout = async () => {
-    try {
-      await api('POST', '/api/auth/logout')
-    } finally {
-      qc.clear()
-      await refetch()
-    }
-  }
-
-  return <AuthContext.Provider value={{ me, refresh: refetch, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>
 }

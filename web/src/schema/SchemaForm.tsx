@@ -33,6 +33,7 @@ import {
   type JSONSchema,
   type Obj,
 } from './types'
+import { text } from '../values'
 
 export interface FieldProps {
   schema: JSONSchema
@@ -49,10 +50,10 @@ const MASKED = '******'
 
 function defaultText(s: JSONSchema) {
   if (s.default === undefined) return undefined
-  return typeof s.default === 'object' ? JSON.stringify(s.default) : String(s.default)
+  return text(s.default)
 }
 
-function describe(s: JSONSchema): ReactNode {
+function describe(s: JSONSchema): string | undefined {
   const parts: string[] = []
   if (s.description) parts.push(s.description)
   const d = defaultText(s)
@@ -61,6 +62,15 @@ function describe(s: JSONSchema): ReactNode {
     parts.push(`faixa: ${s.minimum ?? '−∞'} – ${s.maximum ?? '∞'}`)
   }
   return parts.length ? parts.join(' · ') : undefined
+}
+
+const NO_EXCLUDE: string[] = []
+
+/** String/number entries of a map value (other types are not editable here). */
+function scalarRecord(v: Obj): Record<string, string | number> {
+  const out: Record<string, string | number> = {}
+  for (const [k, x] of Object.entries(v)) if (typeof x === 'string' || typeof x === 'number') out[k] = x
+  return out
 }
 
 /** Renders one value according to its schema. */
@@ -74,7 +84,7 @@ export function SchemaField(props: FieldProps) {
   }
 
   const p = { ...props, schema }
-  if (schema.const !== undefined) return <TextInput label={props.name} value={String(schema.const)} disabled />
+  if (schema.const !== undefined) return <TextInput label={props.name} value={text(schema.const)} disabled />
   if (schema.enum) return <EnumField {...p} />
   switch (schema.type) {
     case 'string':
@@ -140,7 +150,7 @@ function EnumField({ schema, value, onChange, name, required }: FieldProps) {
 }
 
 function StringField({ schema, value, onChange, name, required, path, sensitive }: FieldProps) {
-  const str = typeof value === 'string' ? value : value === undefined ? '' : String(value)
+  const str = text(value)
   const common = {
     label: name || undefined,
     description: describe(schema),
@@ -209,14 +219,15 @@ function ArrayField(props: FieldProps) {
   const list = Array.isArray(value) ? value : []
 
   if (items.enum) {
+    const enumValues = items.enum
     return (
       <MultiSelect
         label={name}
         description={describe(schema)}
         withAsterisk={required}
-        data={items.enum.map(String)}
-        value={list.map(String)}
-        onChange={(v) => onChange(v.map((s) => items.enum!.find((e) => String(e) === s)))}
+        data={items.enum.map(text)}
+        value={list.map(text)}
+        onChange={(v) => onChange(v.map((s) => enumValues.find((e) => text(e) === s)))}
         searchable
         clearable
       />
@@ -240,6 +251,7 @@ function ArrayField(props: FieldProps) {
       <Input.Wrapper label={name} description={describe(schema)} withAsterisk={required}>
         <Stack gap="xs" mt={4}>
           {list.map((item, i) => (
+            // oxlint-disable-next-line react/no-array-index-key -- array items have no identity; fields are controlled
             <Paper key={i} withBorder p="sm" radius="sm">
               <Group justify="space-between" mb={4}>
                 <Text size="xs" c="dimmed">
@@ -367,7 +379,7 @@ export function ObjectFields({
   onChange,
   path,
   sensitive,
-  exclude = [],
+  exclude = NO_EXCLUDE,
   moreLabel = 'Mais opções',
 }: ObjectFieldsProps) {
   const schema = normalize(raw)
@@ -376,16 +388,18 @@ export function ObjectFields({
   const conditional = conditionallyRequired(schema)
   const keys = Object.keys(schema.properties ?? {}).filter((k) => !exclude.includes(k))
   // Decided once so fields do not jump between sections while typing.
-  const initial = useRef(new Set(keys.filter((k) => required.has(k) || conditional.has(k) || obj[k] !== undefined)))
-  const primary = keys.filter((k) => initial.current.has(k))
-  const rest = keys.filter((k) => !initial.current.has(k))
+  const [initial] = useState(
+    () => new Set(keys.filter((k) => required.has(k) || conditional.has(k) || obj[k] !== undefined)),
+  )
+  const primary = keys.filter((k) => initial.has(k))
+  const rest = keys.filter((k) => !initial.has(k))
   const [open, setOpen] = useState(primary.length === 0 && rest.length <= 4)
 
   const field = (k: string) => (
     <SchemaField
       key={k}
       name={k}
-      schema={schema.properties![k]}
+      schema={schema.properties?.[k] ?? {}}
       value={obj[k]}
       required={required.has(k)}
       path={path ? `${path}.${k}` : k}
@@ -433,7 +447,7 @@ function KeyValueField({
       label={name}
       description={describe(schema)}
       required={required}
-      value={isObj(value) ? (value as Record<string, string | number>) : undefined}
+      value={isObj(value) ? scalarRecord(value) : undefined}
       onChange={onChange}
       numeric={numeric}
       secret={sensitive?.(path)}
@@ -478,6 +492,7 @@ export function KeyValueEditor({
     <Input.Wrapper label={label} description={description} withAsterisk={required}>
       <Stack gap={6} mt={4}>
         {rows.map(([k, v], i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- rows have no identity; inputs are controlled
           <Group key={i} gap="xs" wrap="nowrap">
             <TextInput
               placeholder={keyPlaceholder}
@@ -512,13 +527,13 @@ export function KeyValueEditor({
 
 /** Fallback for constructs without a dedicated widget. */
 export function JsonField({ schema, value, onChange, name, required }: FieldProps) {
-  const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
+  const [draft, setDraft] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
   const [error, setError] = useState('')
   const last = useRef(value)
   useEffect(() => {
     if (value !== last.current) {
       last.current = value
-      setText(value === undefined ? '' : JSON.stringify(value, null, 2))
+      setDraft(value === undefined ? '' : JSON.stringify(value, null, 2))
     }
   }, [value])
   return (
@@ -526,21 +541,21 @@ export function JsonField({ schema, value, onChange, name, required }: FieldProp
       label={name || undefined}
       description={[describe(schema), 'JSON'].filter(Boolean).join(' · ')}
       withAsterisk={required}
-      value={text}
+      value={draft}
       error={error}
       autosize
       minRows={2}
       maxRows={14}
-      onChange={setText}
+      onChange={setDraft}
       onBlur={() => {
-        if (!text.trim()) {
+        if (!draft.trim()) {
           setError('')
           last.current = undefined
           onChange(undefined)
           return
         }
         try {
-          const parsed = JSON.parse(text)
+          const parsed = JSON.parse(draft)
           setError('')
           last.current = parsed
           onChange(parsed)

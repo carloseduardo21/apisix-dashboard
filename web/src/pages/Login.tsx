@@ -225,6 +225,7 @@ function MfaVerifyStep({ onDone }: { onDone: () => void }) {
           length={6}
           type="number"
           oneTimeCode
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- single-purpose MFA step; focusing the only input is expected
           autoFocus
           value={code}
           onChange={setCode}

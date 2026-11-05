@@ -17,6 +17,7 @@ import {
 import { IconInfoCircle } from '@tabler/icons-react'
 import { PluginsEditor } from '../schema/PluginsEditor'
 import { isObj, setKey, type Obj } from '../schema/types'
+import { asObj } from '../values'
 import {
   AdvancedFields,
   LabelsField,
@@ -59,7 +60,9 @@ function StatusSwitch({
   )
 }
 
-type Target = 'upstream_id' | 'upstream' | 'service_id' | 'none'
+const TARGETS = ['upstream_id', 'upstream', 'service_id', 'none'] as const
+type Target = (typeof TARGETS)[number]
+const isTarget = (t: string): t is Target => (TARGETS as readonly string[]).includes(t)
 
 /** Where a route/service sends traffic: a shared upstream, an inline one or a service. */
 function Destination({
@@ -103,7 +106,7 @@ function Destination({
 
   return (
     <Stack gap="sm">
-      <SegmentedControl value={target} onChange={(t) => choose(t as Target)} data={options} w="fit-content" />
+      <SegmentedControl value={target} onChange={(t) => isTarget(t) && choose(t)} data={options} w="fit-content" />
       {target === 'upstream_id' && (
         <ResourceSelect
           resource="upstreams"
@@ -175,7 +178,7 @@ function RouteForm({ value, onChange }: FormProps) {
             label="Métodos"
             description="Vazio = todos os métodos"
             data={HTTP_METHODS}
-            value={Array.isArray(value.methods) ? (value.methods as string[]) : []}
+            value={Array.isArray(value.methods) ? value.methods.filter((m): m is string => typeof m === 'string') : []}
             onChange={(m) => onChange(setKey(value, 'methods', m))}
             clearable
             searchable
@@ -210,7 +213,7 @@ function RouteForm({ value, onChange }: FormProps) {
             value={value.plugin_config_id}
             onChange={(v) => onChange(setKey(value, 'plugin_config_id', v))}
           />
-          <PluginsEditor value={value.plugins as Obj} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
+          <PluginsEditor value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
         </Stack>
       </Section>
       <Section value="advanced" title="Avançado" hint="Labels, timeouts, websocket, vars e demais campos do schema">
@@ -273,7 +276,7 @@ function ServiceForm({ value, onChange }: FormProps) {
         <Destination value={value} onChange={onChange} allowNone />
       </Section>
       <Section value="plugins" title="Plugins">
-        <PluginsEditor value={value.plugins as Obj} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
+        <PluginsEditor value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
       </Section>
       <Section value="advanced" title="Avançado">
         <Stack gap="sm">
@@ -340,7 +343,7 @@ function ConsumerForm({ value, onChange, isNew }: FormProps) {
         title="Plugins"
         hint="Prefira cadastrar a autenticação em Credenciais; aqui ficam os demais plugins do consumer"
       >
-        <PluginsEditor consumer value={value.plugins as Obj} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
+        <PluginsEditor consumer value={asObj(value.plugins)} onChange={(p) => onChange(setKey(value, 'plugins', p))} />
       </Section>
     </Sections>
   )
@@ -361,7 +364,7 @@ function CredentialForm({ value, onChange }: FormProps) {
       <PluginsEditor
         consumer
         authOnly
-        value={value.plugins as Obj}
+        value={asObj(value.plugins)}
         onChange={(p) => onChange({ ...value, plugins: p ?? {} })}
       />
     </Stack>
@@ -377,7 +380,7 @@ function PluginsOnlyForm({ value, onChange, withName }: FormProps & { withName?:
       {withName && <LabelsField value={value} onChange={onChange} />}
       <Text fw={500}>Plugins</Text>
       <PluginsEditor
-        value={value.plugins as Obj}
+        value={asObj(value.plugins)}
         onChange={(p) => onChange({ ...setKey(value, 'plugins', p), plugins: p ?? {} })}
       />
     </Stack>
@@ -502,7 +505,7 @@ function StreamRouteForm({ value, onChange }: FormProps) {
       <Section value="plugins" title="Plugins">
         <PluginsEditor
           subsystem="stream"
-          value={value.plugins as Obj}
+          value={asObj(value.plugins)}
           onChange={(p) => onChange(setKey(value, 'plugins', p))}
         />
       </Section>

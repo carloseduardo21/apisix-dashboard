@@ -4,20 +4,20 @@ import { useQuery } from '@tanstack/react-query'
 import { Anchor, Badge, Code, Group, SimpleGrid, Skeleton, Stack, Table, Tabs, Text } from '@mantine/core'
 import { IconCode, IconInfoCircle, IconRoute } from '@tabler/icons-react'
 import { api, itemId, type AdminItem, type AdminList } from '../api'
-import type { Obj } from '../schema/types'
+import { asObj, stringRecord, text, textList, type Obj } from '../values'
 import { EmptyState } from './EmptyState'
 
-const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)])
+const arr = textList
 
 function nodes(up: Obj | undefined): string[] {
   const n = up?.nodes
   if (Array.isArray(n))
-    return n.map(
-      (x) =>
-        `${(x as Obj).host}:${(x as Obj).port}${(x as Obj).weight !== undefined ? ` (peso ${(x as Obj).weight})` : ''}`,
-    )
-  if (n && typeof n === 'object') return Object.entries(n).map(([k, w]) => `${k} (peso ${w})`)
-  if (up?.service_name) return [`${up.discovery_type ?? 'discovery'}: ${up.service_name}`]
+    return n.map((raw) => {
+      const x = asObj(raw) ?? {}
+      return `${text(x.host)}:${text(x.port)}${x.weight !== undefined ? ` (peso ${text(x.weight)})` : ''}`
+    })
+  if (n && typeof n === 'object') return Object.entries(n).map(([k, w]) => `${k} (peso ${text(w)})`)
+  if (up?.service_name) return [`${text(up.discovery_type ?? 'discovery')}: ${text(up.service_name)}`]
   return []
 }
 
@@ -44,10 +44,10 @@ function Upstream({ service }: { service: Obj }) {
   const id = typeof service.upstream_id === 'string' ? service.upstream_id : undefined
   const q = useQuery({
     queryKey: ['apisix', 'upstreams', id],
-    queryFn: () => api<AdminItem>('GET', `/api/apisix/upstreams/${encodeURIComponent(id!)}`),
+    queryFn: () => api<AdminItem>('GET', `/api/apisix/upstreams/${encodeURIComponent(id ?? '')}`),
     enabled: !!id,
   })
-  const up = id ? q.data?.value : (service.upstream as Obj | undefined)
+  const up = id ? q.data?.value : asObj(service.upstream)
   if (id && q.isPending) return <Skeleton h={60} />
   if (!up)
     return id ? (
@@ -70,10 +70,10 @@ function Upstream({ service }: { service: Obj }) {
           </Badge>
         )}
         <Badge size="sm" variant="light">
-          {String(up.type ?? 'roundrobin')}
+          {text(up.type ?? 'roundrobin')}
         </Badge>
         <Badge size="sm" variant="light" color="gray">
-          {String(up.scheme ?? 'http')}
+          {text(up.scheme ?? 'http')}
         </Badge>
         {!!up.checks && (
           <Badge size="sm" variant="light" color="teal">
@@ -103,8 +103,8 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
         .map((r) => ({ id: itemId('routes', r), v: r.value })),
     [routes.data, id],
   )
-  const plugins = Object.keys((value.plugins as Obj) ?? {})
-  const labels = Object.entries((value.labels as Record<string, string>) ?? {})
+  const plugins = Object.keys(asObj(value.plugins) ?? {})
+  const labels = Object.entries(stringRecord(value.labels))
 
   return (
     <Tabs defaultValue="summary" keepMounted={false}>
@@ -131,12 +131,12 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
       <Tabs.Panel value="summary">
         <Stack>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <Field label="Nome">{String(value.name ?? '') || none}</Field>
+            <Field label="Nome">{text(value.name) || none}</Field>
             <Field label="ID">
               <Code>{id}</Code>
             </Field>
           </SimpleGrid>
-          <Field label="Descrição">{String(value.desc ?? '') || none}</Field>
+          <Field label="Descrição">{text(value.desc) || none}</Field>
           <Field label="Upstream">
             <Upstream service={value} />
           </Field>
@@ -200,7 +200,7 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
                     <Table.Tr key={r.id}>
                       <Table.Td>
                         <Anchor component={Link} to={`/r/routes?editar=${encodeURIComponent(r.id)}`} size="sm" fw={500}>
-                          {String(r.v.name ?? '') || r.id}
+                          {text(r.v.name) || r.id}
                         </Anchor>
                         <Text size="xs" c="dimmed" ff="monospace">
                           {r.id}

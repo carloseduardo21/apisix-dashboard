@@ -20,6 +20,7 @@ import {
   Title,
   Tooltip,
   Transition,
+  UnstyledButton,
 } from '@mantine/core'
 import {
   IconAlertTriangle,
@@ -139,7 +140,11 @@ function ServiceRow({
         <ActionIcon variant="subtle" color="gray" onClick={() => setOpen((o) => !o)} aria-label="Detalhes" mt={1}>
           {open ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
         </ActionIcon>
-        <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
+        <UnstyledButton
+          aria-expanded={open}
+          style={{ flex: 1, minWidth: 0, textAlign: 'left' }}
+          onClick={() => setOpen((o) => !o)}
+        >
           <Group justify="space-between" wrap="nowrap" gap="sm">
             <div style={{ minWidth: 0 }}>
               <Group gap={6} wrap="nowrap">
@@ -165,7 +170,7 @@ function ServiceRow({
             </Group>
           </Group>
           <PluginBadges item={g.service} />
-        </div>
+        </UnstyledButton>
       </Group>
       <Collapse expanded={open}>
         <Stack gap="sm" mt="sm" ml={{ base: 0, sm: 64 }}>
@@ -320,6 +325,12 @@ const plural = (n: number, one: string, many: string) => n > 0 && `${n} ${n === 
 
 const empty = (): Selection => ({ services: [], routes: [], consumers: [], globals: [] })
 
+const count = (items: PlanItem[]) => ({
+  total: items.length,
+  migrated: items.filter((i) => i.action === 'unchanged').length,
+  blocked: items.filter((i) => i.action === 'blocked').length,
+})
+
 /** Kong configuration grouped for step-by-step selection. */
 export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Selection) => void }) {
   const [selection, setSelection] = useState<Selection>(empty)
@@ -328,13 +339,13 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
 
   const { groups, orphans, consumers, credentials, globals } = useMemo(() => {
     const byKind = (k: PlanItem['kind']) => plan.items.filter((i) => i.kind === k)
-    const groups: ServiceGroup[] = byKind('service').map((s) => ({
+    const serviceGroups: ServiceGroup[] = byKind('service').map((s) => ({
       service: s,
       upstream: plan.items.find((i) => i.kind === 'upstream' && i.kong_id === s.kong_id),
       routes: plan.items.filter((i) => i.kind === 'route' && i.parent === s.kong_id),
     }))
     return {
-      groups,
+      groups: serviceGroups,
       orphans: plan.items.filter((i) => i.kind === 'route' && !i.parent),
       consumers: byKind('consumer'),
       credentials: byKind('credential'),
@@ -377,11 +388,6 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
     }))
   }
 
-  const count = (items: PlanItem[]) => ({
-    total: items.length,
-    migrated: items.filter((i) => i.action === 'unchanged').length,
-    blocked: items.filter((i) => i.action === 'blocked').length,
-  })
   const nSel =
     selection.services.length + selection.routes.length + selection.consumers.length + selection.globals.length
 
@@ -469,6 +475,7 @@ export function Inventory({ plan, onPreview }: { plan: Plan; onPreview: (s: Sele
             selected={selection.consumers}
             toggle={(id) => toggleIn('consumers', id)}
             setMany={setMany('consumers')}
+            // oxlint-disable-next-line react/no-unstable-nested-components -- render prop invoked as extra?.(item), not mounted as a component
             extra={(c) => {
               const creds = credsOf(c)
               if (!creds.length) return null

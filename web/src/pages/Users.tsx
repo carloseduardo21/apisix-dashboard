@@ -36,6 +36,17 @@ import { avatarColor, initials } from '../components/roles'
 import { api, type DashboardUser, type Role } from '../api'
 import { useAuth } from '../auth'
 
+const isRole = (r: string): r is Role => r === 'viewer' || r === 'operator' || r === 'admin'
+
+const confirm = (title: string, text: string, run: () => void, danger = false) =>
+  modals.openConfirmModal({
+    title,
+    children: <Text size="sm">{text}</Text>,
+    labels: { confirm: 'Confirmar', cancel: 'Cancelar' },
+    confirmProps: danger ? { color: 'red' } : undefined,
+    onConfirm: run,
+  })
+
 const ROLES = [
   { value: 'viewer', label: 'Leitura (viewer)' },
   { value: 'operator', label: 'Operador (operator)' },
@@ -62,15 +73,6 @@ export function Users() {
     },
     onError: (e) => notifications.show({ color: 'red', message: e.message }),
   })
-
-  const confirm = (title: string, text: string, run: () => void, danger = false) =>
-    modals.openConfirmModal({
-      title,
-      children: <Text size="sm">{text}</Text>,
-      labels: { confirm: 'Confirmar', cancel: 'Cancelar' },
-      confirmProps: danger ? { color: 'red' } : undefined,
-      onConfirm: run,
-    })
 
   return (
     <>
@@ -140,6 +142,7 @@ export function Users() {
                         allowDeselect={false}
                         onChange={(role) =>
                           role &&
+                          isRole(role) &&
                           confirm(
                             'Alterar perfil',
                             `Alterar o perfil de ${u.username} para ${role}? As sessões ativas do usuário serão encerradas.`,
@@ -147,7 +150,7 @@ export function Users() {
                               action.mutate({
                                 method: 'PATCH',
                                 path: `/api/users/${u.id}`,
-                                body: { role: role as Role },
+                                body: { role },
                               }),
                           )
                         }
@@ -312,7 +315,10 @@ function ResetPasswordModal({ user, onClose }: { user: DashboardUser | null; onC
   const qc = useQueryClient()
   const [password, setPassword] = useState('')
   const reset = useMutation({
-    mutationFn: () => api('POST', `/api/users/${user!.id}/password`, { password }),
+    mutationFn: () => {
+      if (!user) throw new Error('Nenhum usuário selecionado')
+      return api('POST', `/api/users/${user.id}/password`, { password })
+    },
     onSuccess: () => {
       notifications.show({ color: 'green', message: 'Senha temporária definida' })
       void qc.invalidateQueries({ queryKey: ['users'] })

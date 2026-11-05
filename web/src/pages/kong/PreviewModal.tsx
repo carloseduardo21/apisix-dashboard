@@ -43,6 +43,7 @@ export function NoteList({ notes }: { notes: Note[] }) {
       {notes.map((n, i) => {
         const I = NOTE_ICON[n.level]
         return (
+          // oxlint-disable-next-line react/no-array-index-key -- read-only list from the server, never reordered
           <Group key={i} gap={6} wrap="nowrap" align="flex-start">
             <I
               size={15}
@@ -75,6 +76,7 @@ export function PluginBadges({ item }: { item: PlanItem }) {
     <Group gap={4}>
       {item.plugins.map((p, i) => (
         <Tooltip
+          // oxlint-disable-next-line react/no-array-index-key -- read-only list from the server, never reordered
           key={i}
           label={
             p.status === 'ignored'
@@ -114,7 +116,7 @@ function ItemDetail({ item }: { item: PlanItem }) {
             .filter((p) => p.apisix?.length)
             .map((p) => (
               <Badge key={p.kong} variant="default" size="sm">
-                {p.kong} → {p.apisix!.join(', ')}
+                {p.kong} → {(p.apisix ?? []).join(', ')}
               </Badge>
             ))}
         </Group>
@@ -175,6 +177,7 @@ function JobView({ job }: { job: Job }) {
       <Timeline bulletSize={20} lineWidth={2} active={job.log.length - 1}>
         {job.log.map((e, i) => (
           <Timeline.Item
+            // oxlint-disable-next-line react/no-array-index-key -- read-only list from the server, never reordered
             key={i}
             color={NOTE_COLOR[e.level]}
             bullet={e.level === 'error' ? <IconX size={11} /> : <IconCheck size={11} />}
@@ -198,6 +201,7 @@ function JobView({ job }: { job: Job }) {
           </Table.Thead>
           <Table.Tbody>
             {job.results.map((r, i) => (
+              // oxlint-disable-next-line react/no-array-index-key -- read-only list from the server, never reordered
               <Table.Tr key={i}>
                 <Table.Td>
                   <Text size="xs" c="dimmed">
@@ -246,13 +250,16 @@ export function PreviewModal({
   const [jobId, setJobId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  // Reset the dialog each time it opens (adjusting state on a prop change, no effect needed).
+  const [wasOpened, setWasOpened] = useState(opened)
+  if (opened !== wasOpened) {
+    setWasOpened(opened)
     if (opened) {
       setConfirmed(false)
       setJobId(null)
       setError('')
     }
-  }, [opened])
+  }
 
   const plan = useQuery({
     queryKey: ['kong', 'plan', selection],
@@ -268,22 +275,27 @@ export function PreviewModal({
     refetchInterval: (q) => (q.state.data?.job?.status === 'running' ? 1000 : false),
   })
   const current = job.data?.job?.id === jobId ? job.data?.job : undefined
+  // Depend on the status only: the job object changes on every poll.
+  const status = current?.status
   useEffect(() => {
-    if (current && current.status !== 'running') void qc.invalidateQueries({ queryKey: ['kong'] })
-  }, [current?.status, qc])
+    if (status && status !== 'running') void qc.invalidateQueries({ queryKey: ['kong'] })
+  }, [status, qc])
 
   const apply = useMutation({
-    mutationFn: () => api<Job>('POST', '/api/migration/kong/apply', { ...selection, hash: plan.data!.hash }),
+    mutationFn: () => {
+      if (!plan.data) throw new Error('A pré-visualização ainda não foi carregada')
+      return api<Job>('POST', '/api/migration/kong/apply', { ...selection, hash: plan.data.hash })
+    },
     onSuccess: (j) => setJobId(j.id),
     onError: (e) => setError(e.message),
   })
 
   const items = plan.data?.items ?? []
   const toWrite = items.filter((i) => writes(i.action))
-  const counts = items.reduce<Record<string, number>>(
-    (acc, i) => ({ ...acc, [i.action]: (acc[i.action] ?? 0) + 1 }),
-    {},
-  )
+  const counts = items.reduce<Record<string, number>>((acc, i) => {
+    acc[i.action] = (acc[i.action] ?? 0) + 1
+    return acc
+  }, {})
   const skipped = items.filter((i) => i.action === 'blocked' || i.action === 'conflict').length
 
   return (

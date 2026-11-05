@@ -120,9 +120,11 @@ interface Props {
   subsystem?: 'http' | 'stream'
 }
 
+const NO_PLUGINS: Obj = {}
+
 export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem = 'http' }: Props) {
   const catalog = useCatalog()
-  const plugins = isObj(value) ? value : {}
+  const plugins = isObj(value) ? value : NO_PLUGINS
   const enabled = Object.keys(plugins)
   const [open, setOpen] = useState<string[]>([])
   const [modes, setModes] = useState<Record<string, 'form' | 'json'>>({})
@@ -131,7 +133,7 @@ export function PluginsEditor({ value, onChange, consumer, authOnly, subsystem =
   const available = subsystem === 'stream' ? catalog.data?.stream_plugins : catalog.data?.plugins
   const options = useMemo(() => {
     const groups: Record<string, { value: string; label: string }[]> = {}
-    for (const [name, info] of Object.entries(available ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    for (const [name, info] of Object.entries(available ?? {}).toSorted(([a], [b]) => a.localeCompare(b))) {
       if (name in plugins || (authOnly && info.type !== 'auth')) continue
       ;(groups[category(name, info)] ??= []).push({ value: name, label: name })
     }

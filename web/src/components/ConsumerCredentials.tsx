@@ -8,6 +8,7 @@ import { api, ApiError, type AdminItem, type AdminList } from '../api'
 import type { Obj } from '../schema/types'
 import type { ResourceDef } from '../resources'
 import { ResourceEditor } from './ResourceEditor'
+import { asObj } from '../values'
 
 // Credentials live under the consumer: /consumers/{username}/credentials/{id}.
 const CREDENTIAL_DEF: ResourceDef = {
@@ -132,7 +133,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
             <Table.Tbody>
               {list.map((item) => {
                 const id = credentialId(item)
-                const plugins = Object.keys((item.value.plugins as Obj) ?? {})
+                const plugins = Object.keys(asObj(item.value.plugins) ?? {})
                 return (
                   <Table.Tr key={item.key}>
                     <Table.Td>
@@ -205,7 +206,7 @@ export function ConsumerCredentials({ username, writable }: { username: string; 
         editing={editing?.mode === 'edit' ? editing : undefined}
         onClose={() => setEditing(null)}
         onSubmit={async (value, id) => {
-          if (!Object.keys((value.plugins as Obj) ?? {}).length) throw new Error('Adicione um plugin de autenticação')
+          if (!Object.keys(asObj(value.plugins) ?? {}).length) throw new Error('Adicione um plugin de autenticação')
           await api('PUT', `${base}/${encodeURIComponent(id)}`, value)
           done('Salva', `Credencial ${id} salva`)
         }}

@@ -133,6 +133,7 @@ function LogTimeline({ log }: { log: LogEntry[] }) {
     <Timeline bulletSize={22} lineWidth={2} active={log.length - 1}>
       {log.map((e, i) => (
         <Timeline.Item
+          // oxlint-disable-next-line react/no-array-index-key -- read-only list from the server, never reordered
           key={i}
           color={e.level === 'error' ? 'red' : e.level === 'warn' ? 'orange' : 'indigo'}
           bullet={
@@ -424,7 +425,7 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
     ? `acme-${domains[0].toLowerCase().replace('*', 'wildcard').replaceAll('.', '-')}`.slice(0, 64)
     : ''
   const effectiveId = sslId.trim() || defaultId
-  const managedIds = new Set(existing.map((c) => c.ssl_id))
+  const managedIds = useMemo(() => new Set(existing.map((c) => c.ssl_id)), [existing])
   const alreadyManaged = managedIds.has(effectiveId)
   const sameId = !alreadyManaged && (ssls.data?.list ?? []).some((i) => itemId('ssls', i) === effectiveId)
   const overlapping = useMemo(() => {
@@ -446,6 +447,7 @@ function CreateModal({ opened, onClose, existing }: { opened: boolean; onClose: 
         ssl_id: sslId.trim(),
         replace,
       }),
+    // oxlint-disable-next-line react/no-unstable-nested-components -- mutation callback that builds a notification icon element, not a component
     onSuccess: () => {
       notifications.show({
         color: 'indigo',
@@ -618,6 +620,7 @@ export function Certificates() {
   const remove = useMutation({
     mutationFn: ({ id, ssl }: { id: number; ssl: boolean }) =>
       api('DELETE', `/api/acme/certificates/${id}${ssl ? '?delete_ssl=true' : ''}`),
+    // oxlint-disable-next-line react/no-unstable-nested-components -- mutation callback that builds a notification icon element, not a component
     onSuccess: () => {
       notifications.show({
         color: 'teal',

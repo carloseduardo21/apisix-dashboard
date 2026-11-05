@@ -141,7 +141,7 @@ export function matchVariant(variants: JSONSchema[], value: unknown): number {
 export function variantLabel(raw: JSONSchema, i: number): string {
   const v = normalize(raw)
   if (v.title) return v.title
-  if (v.const !== undefined) return String(v.const)
+  if (v.const !== undefined) return typeof v.const === 'string' ? v.const : JSON.stringify(v.const)
   if (v.required?.length && v.type === 'object') return v.required.join(' + ')
   if (v.description && v.description.length < 40) return v.description
   const names: Record<string, string> = {

@@ -14,8 +14,7 @@ import {
   IconLock,
   type Icon,
 } from '@tabler/icons-react'
-
-type Obj = Record<string, unknown>
+import { asObj, text, type Obj } from './values'
 
 export interface Column {
   label: string
@@ -40,13 +39,13 @@ export interface ResourceDef {
 
 /** SSL objects issued by the dashboard's ACME module: edited only there. */
 export const isManagedSSL = (resource: string, v: Obj) =>
-  resource === 'ssls' && (v.labels as Obj | undefined)?.['managed-by'] === 'apisix-dashboard'
+  resource === 'ssls' && asObj(v.labels)?.['managed-by'] === 'apisix-dashboard'
 
-const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v))
+const str = text
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : [v])
 
 function Plugins({ v }: { v: Obj }) {
-  const names = Object.keys((v.plugins as Obj) ?? {})
+  const names = Object.keys(asObj(v.plugins) ?? {})
   if (!names.length)
     return (
       <Text c="dimmed" size="sm">
@@ -80,17 +79,22 @@ function Status({ v }: { v: Obj }) {
 
 function nodesText(nodes: unknown): string {
   if (Array.isArray(nodes)) {
-    return nodes.map((n) => `${(n as Obj).host}:${(n as Obj).port}`).join(', ')
+    return nodes
+      .map((raw) => {
+        const n = asObj(raw) ?? {}
+        return `${text(n.host)}:${text(n.port)}`
+      })
+      .join(', ')
   }
   if (nodes && typeof nodes === 'object') return Object.keys(nodes).join(', ')
   return ''
 }
 
 function upstreamText(v: Obj): string {
-  if (v.upstream_id) return `upstream ${v.upstream_id}`
-  if (v.service_id) return `service ${v.service_id}`
-  const up = v.upstream as Obj | undefined
-  if (up) return up.service_name ? `discovery: ${up.service_name}` : nodesText(up.nodes)
+  if (v.upstream_id) return `upstream ${text(v.upstream_id)}`
+  if (v.service_id) return `service ${text(v.service_id)}`
+  const up = asObj(v.upstream)
+  if (up) return up.service_name ? `discovery: ${text(up.service_name)}` : nodesText(up.nodes)
   return ''
 }
 
@@ -169,7 +173,9 @@ export const RESOURCES: ResourceDef[] = [
       {
         label: 'Nós',
         render: (v) =>
-          mono(v.service_name ? `${v.discovery_type ?? 'discovery'}: ${v.service_name}` : nodesText(v.nodes)),
+          mono(
+            v.service_name ? `${text(v.discovery_type ?? 'discovery')}: ${text(v.service_name)}` : nodesText(v.nodes),
+          ),
       },
       { label: 'Esquema', render: (v) => <Text size="sm">{str(v.scheme) || 'http'}</Text> },
       {

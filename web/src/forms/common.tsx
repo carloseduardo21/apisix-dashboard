@@ -4,6 +4,7 @@ import { Accordion, Select, TagsInput, Text, TextInput, Textarea } from '@mantin
 import { api, itemId, type AdminList } from '../api'
 import { KeyValueEditor, ObjectFields } from '../schema/SchemaForm'
 import { isObj, setKey, useCatalog, type Obj } from '../schema/types'
+import { stringRecord, text } from '../values'
 
 export interface FormProps {
   value: Obj
@@ -62,7 +63,7 @@ export function OneOrMany({
   required?: boolean
 }) {
   const list = Array.isArray(value[many])
-    ? (value[many] as string[])
+    ? value[many].filter((x): x is string => typeof x === 'string')
     : typeof value[single] === 'string'
       ? [value[single]]
       : []
@@ -113,7 +114,7 @@ export function ResourceSelect({
   required?: boolean
 }) {
   const { data = [], isPending } = useResourceOptions(resource)
-  const current = value === undefined || value === null ? null : String(value)
+  const current = value === undefined || value === null ? null : text(value)
   // Keep a dangling reference visible instead of silently clearing it.
   const options =
     current && !data.some((o) => o.value === current)
@@ -141,7 +142,7 @@ export function LabelsField({ value, onChange }: { value: Obj; onChange: (v: Obj
     <KeyValueEditor
       label="Labels"
       description="Pares chave/valor para organizar e filtrar recursos"
-      value={isObj(value.labels) ? (value.labels as Record<string, string>) : undefined}
+      value={isObj(value.labels) ? stringRecord(value.labels) : undefined}
       onChange={(v) => onChange(setKey(value, 'labels', v))}
     />
   )

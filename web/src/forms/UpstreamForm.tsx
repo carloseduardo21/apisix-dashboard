@@ -16,6 +16,7 @@ import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { ObjectFields, SchemaField } from '../schema/SchemaForm'
 import { isObj, setKey, useCatalog, type Obj } from '../schema/types'
 import { LabelsField, NameDesc, str, textProps } from './common'
+import { text } from '../values'
 
 interface Node {
   host: string
@@ -24,9 +25,20 @@ interface Node {
   priority?: number
 }
 
+/** Typed copy of a node object; extra fields (e.g. metadata) are preserved. */
+function toNode(n: Obj): Node {
+  return {
+    ...n,
+    host: text(n.host),
+    port: typeof n.port === 'number' ? n.port : undefined,
+    weight: typeof n.weight === 'number' ? n.weight : 1,
+    priority: typeof n.priority === 'number' ? n.priority : undefined,
+  }
+}
+
 /** APISIX accepts {"host:port": weight} or [{host, port, weight}]; the form edits the list. */
 function toNodes(v: unknown): Node[] {
-  if (Array.isArray(v)) return v.filter(isObj).map((n) => ({ ...(n as unknown as Node) }))
+  if (Array.isArray(v)) return v.filter(isObj).map(toNode)
   if (isObj(v)) {
     return Object.entries(v).map(([addr, weight]) => {
       const i = addr.lastIndexOf(':')
@@ -66,6 +78,7 @@ function NodesEditor({ value, onChange }: { value: unknown; onChange: (v: Node[]
           </Group>
         )}
         {nodes.map((n, i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- rows have no identity and every input is controlled
           <Group key={i} gap="xs" wrap="nowrap">
             <TextInput
               style={{ flex: 3 }}

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import {
@@ -33,6 +34,7 @@ import { avatarColor, initials } from '../components/roles'
 import { actionLabel, actionColor } from './Audit'
 import { MAIN_RESOURCES, RESOURCE_BY_KEY } from '../resources'
 import classes from './Overview.module.css'
+import { asObj, errorMessage, numberOr } from '../values'
 
 type Obj = Record<string, unknown>
 
@@ -59,7 +61,7 @@ function detail(key: string, values: Obj[]): string {
       return `${checked} com health check`
     }
     case 'consumers': {
-      const auth = values.filter((v) => Object.keys((v.plugins as Obj) ?? {}).some((p) => p.includes('auth'))).length
+      const auth = values.filter((v) => Object.keys(asObj(v.plugins) ?? {}).some((p) => p.includes('auth'))).length
       return `${auth} com autenticação`
     }
     case 'ssls': {
@@ -71,7 +73,7 @@ function detail(key: string, values: Obj[]): string {
     case 'global_rules':
       return 'aplicadas a todo o tráfego'
     default: {
-      const plugins = new Set(values.flatMap((v) => Object.keys((v.plugins as Obj) ?? {})))
+      const plugins = new Set(values.flatMap((v) => Object.keys(asObj(v.plugins) ?? {})))
       return `${plugins.size} plugin(s) distintos`
     }
   }
@@ -99,7 +101,7 @@ function GatewayCard() {
               <Text size="sm" c="dimmed">
                 {ok
                   ? `${data?.server || 'APISIX'} · Admin API respondendo em ${data?.latency_ms} ms`
-                  : ((data as { error?: string })?.error ?? (error as Error)?.message)}
+                  : (data?.error ?? (error ? errorMessage(error) : undefined))}
               </Text>
             </div>
           </Group>
@@ -132,11 +134,12 @@ export function Overview() {
     .map((i) => ({
       id: itemId('ssls', i),
       snis: ([] as unknown[]).concat(i.value.snis ?? i.value.sni ?? []).join(', '),
-      days: daysLeft(i.value.validity_end as number),
+      days: daysLeft(numberOr(i.value.validity_end, 0)),
     }))
-    .sort((a, b) => a.days - b.days)
+    .toSorted((a, b) => a.days - b.days)
 
-  const hour = new Date().getHours()
+  // Read once per mount: rendering must stay pure.
+  const [hour] = useState(() => new Date().getHours())
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
   return (

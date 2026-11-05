@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ActionIcon,
@@ -24,6 +24,7 @@ import { api } from '../../api'
 import { KeyValueEditor } from '../../schema/SchemaForm'
 import { useCatalog } from '../../schema/types'
 import type { PluginRule, Settings } from './types'
+import { errorMessage, stringRecord } from '../../values'
 
 function Choice<T extends string>({
   label,
@@ -86,7 +87,7 @@ function RuleEditor({
       setError('')
       onChange({ ...rule, template: t })
     } catch (e) {
-      setError((e as Error).message)
+      setError(errorMessage(e))
     }
   }
   return (
@@ -153,17 +154,26 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
   const [error, setError] = useState('')
   // Remounts the key/value editor when the saved settings are reloaded.
   const [version, setVersion] = useState(0)
-  useEffect(() => {
+  // Stable React keys for plugin rules: RuleEditor keeps the template text in local
+  // state, so index keys would hand one rule's text to another after a removal.
+  const [ruleKeys, setRuleKeys] = useState<number[]>(() => settings.plugin_rules.map((_, i) => i))
+  const [nextRuleKey, setNextRuleKey] = useState(settings.plugin_rules.length)
+  const [prevSettings, setPrevSettings] = useState(settings)
+  if (settings !== prevSettings) {
+    setPrevSettings(settings)
     setDraft(settings)
     setVersion((v) => v + 1)
-  }, [settings])
+    setRuleKeys(settings.plugin_rules.map((_, i) => nextRuleKey + i))
+    setNextRuleKey(nextRuleKey + settings.plugin_rules.length)
+  }
 
-  const apisixPlugins = useMemo(() => Object.keys(catalog.data?.plugins ?? {}).sort(), [catalog.data])
+  const apisixPlugins = useMemo(() => Object.keys(catalog.data?.plugins ?? {}).toSorted(), [catalog.data])
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings)
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setDraft((d) => ({ ...d, [k]: v }))
 
   const save = useMutation({
     mutationFn: () => api<Settings>('PUT', '/api/migration/kong/settings', draft),
+    // oxlint-disable-next-line react/no-unstable-nested-components -- mutation callback that builds a notification icon element, not a component
     onSuccess: () => {
       setError('')
       notifications.show({
@@ -283,6 +293,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           </Text>
           <Stack gap={6}>
             {draft.host_rewrites.map((h, i) => (
+              // oxlint-disable-next-line react/no-array-index-key -- rows have no identity and every input is controlled
               <Group key={i} gap="xs" wrap="nowrap">
                 <TextInput
                   placeholder="pagamentos.interno"
@@ -343,7 +354,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
               </>
             }
             value={draft.labels}
-            onChange={(v) => set('labels', (v as Record<string, string>) ?? {})}
+            onChange={(v) => set('labels', stringRecord(v))}
             keyPlaceholder="lote"
             valuePlaceholder="onda-1"
           />
@@ -362,12 +373,14 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           <Button
             variant="light"
             leftSection={<IconPlus size={16} />}
-            onClick={() =>
+            onClick={() => {
               set('plugin_rules', [
                 ...draft.plugin_rules,
                 { kong_plugin: '', action: 'map', apisix_plugin: '', template: undefined },
               ])
-            }
+              setRuleKeys((k) => [...k, nextRuleKey])
+              setNextRuleKey((n) => n + 1)
+            }}
           >
             Nova regra
           </Button>
@@ -389,7 +402,7 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
           )}
           {draft.plugin_rules.map((r, i) => (
             <RuleEditor
-              key={`${version}-${i}`}
+              key={ruleKeys[i]}
               rule={r}
               kongPlugins={kongPlugins}
               apisixPlugins={apisixPlugins}
@@ -399,12 +412,13 @@ export function SettingsForm({ settings, kongPlugins }: { settings: Settings; ko
                   draft.plugin_rules.map((x, j) => (j === i ? nr : x)),
                 )
               }
-              onRemove={() =>
+              onRemove={() => {
                 set(
                   'plugin_rules',
                   draft.plugin_rules.filter((_, j) => j !== i),
                 )
-              }
+                setRuleKeys((k) => k.filter((_, j) => j !== i))
+              }}
             />
           ))}
         </Stack>

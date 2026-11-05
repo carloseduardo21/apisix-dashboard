@@ -45,6 +45,7 @@ interface Status {
   reachable: boolean
   server?: string
   latency_ms: number
+  error?: string
 }
 
 /** Shared with the overview page: one request feeds both. */
@@ -62,7 +63,9 @@ function GatewayIndicator() {
         variant="light"
         color={ok ? 'teal' : 'red'}
         leftSection={
-          <Indicator color={ok ? 'teal' : 'red'} size={7} processing={ok} position="middle-center" children={null} />
+          <Indicator color={ok ? 'teal' : 'red'} size={7} processing={ok} position="middle-center">
+            {null}
+          </Indicator>
         }
         visibleFrom="sm"
         styles={{ section: { width: 12, display: 'flex', justifyContent: 'center' } }}
@@ -212,10 +215,14 @@ export function Layout() {
         <AppShell.Section grow component={ScrollArea} scrollbarSize={6}>
           {link('/', 'Visão geral', IconGauge)}
           <div className={classes.groupLabel}>Gateway</div>
-          {RESOURCES.flatMap((r) => [
-            link(`/r/${r.key}`, r.label, r.icon),
-            ...(r.key === 'ssls' ? [link('/certificados', 'Certificados automáticos', IconCertificate2)] : []),
-          ])}
+          {RESOURCES.flatMap((r) =>
+            r.key === 'ssls'
+              ? [
+                  link(`/r/${r.key}`, r.label, r.icon),
+                  link('/certificados', 'Certificados automáticos', IconCertificate2),
+                ]
+              : [link(`/r/${r.key}`, r.label, r.icon)],
+          )}
           {canWrite(me.role) && (
             <>
               <div className={classes.groupLabel}>Migração</div>

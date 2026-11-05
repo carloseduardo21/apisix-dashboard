@@ -47,6 +47,7 @@ import { PageHeader } from '../components/PageHeader'
 import { ResourceEditor } from '../components/ResourceEditor'
 import { ServiceDetails } from '../components/ServiceDetails'
 import { isManagedSSL, type ResourceDef } from '../resources'
+import { text } from '../values'
 
 // Fields managed by APISIX that must not be sent back on update.
 const READ_ONLY = ['create_time', 'update_time', 'validity_start', 'validity_end']
@@ -75,6 +76,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
   // "?novo=1" (from the command palette) opens the creation form.
   useEffect(() => {
     if (params.get('novo') && writable) {
+      // oxlint-disable-next-line react/set-state-in-effect -- consumes a one-shot URL command and clears it in the router (external system)
       setEditing({ mode: 'create' })
       setParams({}, { replace: true })
     }
@@ -92,6 +94,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
     if (!id || !data) return
     const item = data.list.find((i) => itemId(def.key, i) === id)
     if (item) {
+      // oxlint-disable-next-line react/set-state-in-effect -- consumes a one-shot URL command and clears it in the router (external system)
       if (writable && !isManagedSSL(def.key, item.value)) setEditing({ mode: 'edit', id, value: editable(item.value) })
       else setViewing(item)
     }
@@ -123,6 +126,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
       if (def.create === 'put-body') return api('PUT', `/api/apisix/${def.key}`, value)
       return api('PUT', `/api/apisix/${def.key}/${id}`, value)
     },
+    // oxlint-disable-next-line react/no-unstable-nested-components -- mutation callback that builds a notification icon element, not a component
     onSuccess: () => {
       notifications.show({
         color: 'teal',
@@ -136,6 +140,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
 
   const remove = useMutation({
     mutationFn: (id: string) => api('DELETE', `/api/apisix/${def.key}/${id}`),
+    // oxlint-disable-next-line react/no-unstable-nested-components -- mutation callback that builds a notification icon element, not a component
     onSuccess: () => {
       notifications.show({
         color: 'teal',
@@ -359,7 +364,7 @@ export function ResourcePage({ def }: { def: ResourceDef }) {
                 <def.icon size={18} />
               </ThemeIcon>
               <div>
-                <Text fw={600}>{String(viewing.value.name ?? viewing.value.username ?? def.singular)}</Text>
+                <Text fw={600}>{text(viewing.value.name ?? viewing.value.username ?? def.singular)}</Text>
                 <Text size="xs" c="dimmed" ff="monospace">
                   {itemId(def.key, viewing)}
                 </Text>
