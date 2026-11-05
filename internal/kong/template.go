@@ -2,10 +2,11 @@ package kong
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 // Templates of PluginRule. Available roots:
@@ -36,7 +37,7 @@ func checkTemplate(tpl map[string]any) error {
 		for _, m := range placeholderRe.FindAllStringSubmatch(s, -1) {
 			path, _, _ := strings.Cut(m[1], "|")
 			if strings.TrimSpace(path) == "" && err == nil {
-				err = fmt.Errorf("placeholder vazio em %q", s)
+				err = i18n.E("kong.settings.empty_placeholder", "empty placeholder in '{value}'", "value", s)
 			}
 		}
 	})

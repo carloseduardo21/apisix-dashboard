@@ -12,6 +12,7 @@ import (
 	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
 	"github.com/carloseduardo21/apisix-dashboard/internal/auth"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
@@ -20,7 +21,17 @@ var listParams = []string{"page", "page_size", "name", "label", "uri"}
 
 func badGateway(w http.ResponseWriter, err error) {
 	slog.Error("admin api request failed", "err", err)
-	writeError(w, http.StatusBadGateway, "falha ao contactar a Admin API do APISIX")
+	writeError(w, http.StatusBadGateway, "apisix.unreachable", "could not reach the APISIX Admin API")
+}
+
+// setMessage adds a user-facing message to a JSON object, with the same
+// error/code/params fields as an error response.
+func setMessage(out map[string]any, m i18n.Message) {
+	out["error"] = m.String()
+	out["code"] = m.Code
+	if len(m.Params) > 0 {
+		out["params"] = m.Params
+	}
 }
 
 func (s *Server) mask(resource string, v any) any {
@@ -43,7 +54,7 @@ func (s *Server) writeAdminResponse(w http.ResponseWriter, resource string, resp
 	v, err := apisix.Decode(resp.Body)
 	if err != nil {
 		// Not JSON (unexpected): do not relay raw content.
-		writeError(w, resp.Status, http.StatusText(resp.Status))
+		writeError(w, resp.Status, "apisix.http_error", "the Admin API answered HTTP {status}", "status", resp.Status)
 		return
 	}
 	if resp.OK() {
@@ -61,12 +72,12 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request, p *princip
 	out := map[string]any{"reachable": false, "latency_ms": time.Since(start).Milliseconds()}
 	if err != nil {
 		slog.Warn("admin api unreachable", "err", err)
-		out["error"] = "Admin API inacessível"
+		setMessage(out, i18n.M("apisix.unreachable", "could not reach the APISIX Admin API"))
 	} else {
 		out["reachable"] = resp.OK()
 		out["server"] = resp.Server
 		if !resp.OK() {
-			out["error"] = "Admin API respondeu HTTP " + http.StatusText(resp.Status)
+			setMessage(out, i18n.M("apisix.http_error", "the Admin API answered HTTP {status}", "status", resp.Status))
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -77,7 +88,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request, p *princip
 func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request, p *principal) {
 	name := r.PathValue("name")
 	if !apisix.ValidPluginName(name) {
-		writeError(w, http.StatusNotFound, "não encontrado")
+		notFound(w)
 		return
 	}
 	q := url.Values{}
@@ -92,7 +103,7 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request, p *princi
 	// Re-encode instead of relaying raw bytes: only valid JSON reaches the browser.
 	v, err := apisix.Decode(resp.Body)
 	if err != nil {
-		writeError(w, resp.Status, http.StatusText(resp.Status))
+		writeError(w, resp.Status, "apisix.http_error", "the Admin API answered HTTP {status}", "status", resp.Status)
 		return
 	}
 	writeJSON(w, resp.Status, v)
@@ -101,7 +112,7 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request, p *princi
 func (s *Server) handleAPISIX(w http.ResponseWriter, r *http.Request, p *principal) {
 	path, ok := apisix.ParsePath(r.PathValue("path"))
 	if !ok {
-		writeError(w, http.StatusNotFound, "recurso não suportado")
+		writeError(w, http.StatusNotFound, "apisix.unsupported_resource", "unsupported resource")
 		return
 	}
 	switch r.Method {
@@ -109,12 +120,12 @@ func (s *Server) handleAPISIX(w http.ResponseWriter, r *http.Request, p *princip
 		s.apisixRead(w, r, path)
 	case http.MethodPut, http.MethodPost, http.MethodPatch, http.MethodDelete:
 		if !auth.CanWrite(p.user.Role) {
-			writeError(w, http.StatusForbidden, "seu perfil não permite alterações")
+			writeError(w, http.StatusForbidden, "auth.read_only_role", "your role does not allow changes")
 			return
 		}
 		s.apisixWrite(w, r, p, path)
 	default:
-		writeError(w, http.StatusMethodNotAllowed, "método não permitido")
+		writeError(w, http.StatusMethodNotAllowed, "api.method_not_allowed", "method not allowed")
 	}
 }
 
@@ -151,12 +162,12 @@ func (s *Server) apisixWrite(w http.ResponseWriter, r *http.Request, p *principa
 	if r.Method != http.MethodDelete {
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodySize))
 		if err != nil {
-			writeError(w, http.StatusRequestEntityTooLarge, "corpo da requisição muito grande")
+			writeError(w, http.StatusRequestEntityTooLarge, "api.body_too_large", "request body too large")
 			return
 		}
 		body, err = apisix.Decode(raw)
 		if _, isObj := body.(map[string]any); err != nil || !isObj {
-			writeError(w, http.StatusBadRequest, "o corpo deve ser um objeto JSON")
+			writeError(w, http.StatusBadRequest, "api.body_must_be_object", "the request body must be a JSON object")
 			return
 		}
 	}
@@ -176,7 +187,7 @@ func (s *Server) apisixWrite(w http.ResponseWriter, r *http.Request, p *principa
 	// a manual edit cannot be silently overwritten by the next renewal.
 	if target.Resource == "ssls" && target.IsItem() {
 		if c, err := s.Store.GetCertificateBySSLID(ctx, target.ID()); err == nil {
-			writeError(w, http.StatusConflict, "este SSL é emitido automaticamente ("+strings.Join(c.Domains, ", ")+"); gerencie-o em Certificados automáticos")
+			writeError(w, http.StatusConflict, "apisix.ssl_managed", "this SSL is issued automatically ({domains}); manage it under Automatic certificates", "domains", strings.Join(c.Domains, ", "))
 			return
 		}
 	}
@@ -201,7 +212,9 @@ func (s *Server) apisixWrite(w http.ResponseWriter, r *http.Request, p *principa
 	if body != nil {
 		restored, err := apisix.Unmask(body, before)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
+			if !writeUserError(w, http.StatusBadRequest, err) {
+				internalError(w, err)
+			}
 			return
 		}
 		payload, _ = json.Marshal(restored)

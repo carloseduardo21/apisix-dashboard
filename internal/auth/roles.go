@@ -1,6 +1,6 @@
 package auth
 
-import "fmt"
+import "github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 
 // Roles, from least to most privileged (PCI DSS 7.2: least privilege).
 const (
@@ -18,10 +18,12 @@ func IsAdmin(role string) bool  { return role == RoleAdmin }
 
 // ValidationError is an error caused by user input; its message is safe to
 // show in the UI.
-type ValidationError struct{ msg string }
+type ValidationError struct{ msg i18n.Message }
 
-func (e *ValidationError) Error() string { return e.msg }
+func (e *ValidationError) Error() string             { return e.msg.String() }
+func (e *ValidationError) UserMessage() i18n.Message { return e.msg }
 
-func validationErr(format string, args ...any) error {
-	return &ValidationError{msg: fmt.Sprintf(format, args...)}
+// validationErr builds a ValidationError (see i18n.M for the arguments).
+func validationErr(code, template string, kv ...any) error {
+	return &ValidationError{msg: i18n.M(code, template, kv...)}
 }

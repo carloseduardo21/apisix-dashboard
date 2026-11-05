@@ -18,6 +18,7 @@ import (
 	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
 	"github.com/carloseduardo21/apisix-dashboard/internal/auth"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/kong"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
@@ -98,7 +99,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/apisix/{path...}", s.require(access{}, s.handleAPISIX))
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, "not found")
+		notFound(w)
 	})
 	mux.Handle("/", spaHandler(s.Static))
 
@@ -148,13 +149,13 @@ func (s *Server) require(a access, h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(cookieName)
 		if err != nil || c.Value == "" {
-			writeError(w, http.StatusUnauthorized, "não autenticado")
+			writeError(w, http.StatusUnauthorized, "auth.not_authenticated", "not authenticated")
 			return
 		}
 		sess, user, err := s.Auth.Authenticate(r.Context(), c.Value)
 		if errors.Is(err, auth.ErrSessionExpired) {
 			s.clearCookie(w)
-			writeError(w, http.StatusUnauthorized, err.Error())
+			writeUserError(w, http.StatusUnauthorized, err)
 			return
 		}
 		if err != nil {
@@ -163,24 +164,24 @@ func (s *Server) require(a access, h handler) http.HandlerFunc {
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if subtle.ConstantTimeCompare([]byte(r.Header.Get(csrfHeader)), []byte(sess.CSRFToken)) != 1 {
-				writeError(w, http.StatusForbidden, "token CSRF inválido")
+				writeError(w, http.StatusForbidden, "auth.csrf_invalid", "invalid CSRF token")
 				return
 			}
 		}
 		if !sess.MFAOK && !a.pending {
-			writeError(w, http.StatusUnauthorized, "MFA pendente")
+			writeError(w, http.StatusUnauthorized, "auth.mfa_pending", "MFA verification pending")
 			return
 		}
 		if sess.MFAOK && user.MustChangePassword && !a.mustChange {
-			writeError(w, http.StatusForbidden, "troca de senha obrigatória")
+			writeError(w, http.StatusForbidden, "auth.password_change_required", "password change required")
 			return
 		}
 		if a.admin && !auth.IsAdmin(user.Role) {
-			writeError(w, http.StatusForbidden, "acesso restrito a administradores")
+			writeError(w, http.StatusForbidden, "auth.admin_only", "restricted to administrators")
 			return
 		}
 		if a.write && !auth.CanWrite(user.Role) {
-			writeError(w, http.StatusForbidden, "seu perfil não permite alterações")
+			writeError(w, http.StatusForbidden, "auth.read_only_role", "your role does not allow changes")
 			return
 		}
 		h(w, r, &principal{sess: sess, user: user, meta: s.meta(r)})
@@ -239,13 +240,49 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v) // headers already sent; client may have gone away
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+// errorBody is the JSON shape of every error response. "error" is English;
+// the UI translates "code" with "params" (see internal/i18n).
+type errorBody struct {
+	Error   string            `json:"error"`
+	Code    string            `json:"code"`
+	Params  map[string]string `json:"params,omitempty"`
+	Details []i18n.Message    `json:"details,omitempty"`
+}
+
+func writeMessages(w http.ResponseWriter, status int, msgs ...i18n.Message) {
+	body := errorBody{Error: msgs[0].String(), Code: msgs[0].Code, Params: msgs[0].Params}
+	if len(msgs) > 1 {
+		texts := make([]string, len(msgs))
+		for i, m := range msgs {
+			texts[i] = m.String()
+		}
+		body = errorBody{Error: strings.Join(texts, "; "), Code: "api.multiple_errors", Details: msgs}
+	}
+	writeJSON(w, status, body)
+}
+
+// writeError writes a user-facing error (see i18n.M for the arguments).
+func writeError(w http.ResponseWriter, status int, code, template string, kv ...any) {
+	writeMessages(w, status, i18n.M(code, template, kv...))
+}
+
+// writeUserError writes the user-facing message(s) carried by err and reports
+// whether it did; errors without one must be handled by the caller.
+func writeUserError(w http.ResponseWriter, status int, err error) bool {
+	msgs, ok := i18n.Messages(err)
+	if ok {
+		writeMessages(w, status, msgs...)
+	}
+	return ok
+}
+
+func notFound(w http.ResponseWriter) {
+	writeError(w, http.StatusNotFound, "api.not_found", "not found")
 }
 
 func internalError(w http.ResponseWriter, err error) {
 	slog.Error("request failed", "err", err)
-	writeError(w, http.StatusInternalServerError, "erro interno")
+	writeError(w, http.StatusInternalServerError, "api.internal_error", "internal error")
 }
 
 // handleErr maps errors from the auth package to responses.
@@ -253,13 +290,13 @@ func handleErr(w http.ResponseWriter, err error) {
 	var ve *auth.ValidationError
 	switch {
 	case errors.As(err, &ve):
-		writeError(w, http.StatusBadRequest, ve.Error())
+		writeUserError(w, http.StatusBadRequest, err)
 	case errors.Is(err, auth.ErrInvalidCredentials), errors.Is(err, auth.ErrInvalidCode):
-		writeError(w, http.StatusUnauthorized, err.Error())
+		writeUserError(w, http.StatusUnauthorized, err)
 	case errors.Is(err, auth.ErrMFAState):
-		writeError(w, http.StatusConflict, err.Error())
+		writeUserError(w, http.StatusConflict, err)
 	case errors.Is(err, store.ErrNotFound):
-		writeError(w, http.StatusNotFound, "não encontrado")
+		notFound(w)
 	default:
 		internalError(w, err)
 	}
@@ -268,11 +305,11 @@ func handleErr(w http.ResponseWriter, err error) {
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodySize))
 	if err != nil {
-		writeError(w, http.StatusRequestEntityTooLarge, "corpo da requisição muito grande")
+		writeError(w, http.StatusRequestEntityTooLarge, "api.body_too_large", "request body too large")
 		return false
 	}
 	if err := json.Unmarshal(b, v); err != nil {
-		writeError(w, http.StatusBadRequest, "JSON inválido")
+		writeError(w, http.StatusBadRequest, "api.invalid_json", "invalid JSON")
 		return false
 	}
 	return true

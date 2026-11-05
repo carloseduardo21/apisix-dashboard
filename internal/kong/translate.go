@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 const (
@@ -33,9 +35,15 @@ const (
 	LabelGroups = "groups"
 )
 
+// Note explains how an object was translated. Message is English; the UI
+// translates Code/Params (and Reason, when a plugin could not be translated).
 type Note struct {
-	Level   string `json:"level"`
-	Message string `json:"message"`
+	Level   string            `json:"level"`
+	Message string            `json:"message"`
+	Code    string            `json:"code"`
+	Params  map[string]string `json:"params,omitempty"`
+	Plugin  string            `json:"plugin,omitempty"`
+	Reason  *i18n.Message     `json:"reason,omitempty"`
 }
 
 // PluginMap tells how one Kong plugin was translated.
@@ -61,8 +69,23 @@ type Item struct {
 	Blocked  bool           `json:"blocked"`
 }
 
-func (it *Item) note(level, format string, args ...any) {
-	it.Notes = append(it.Notes, Note{Level: level, Message: fmt.Sprintf(format, args...)})
+func (it *Item) note(level string, m i18n.Message) {
+	it.addNote(Note{Level: level, Message: m.String(), Code: m.Code, Params: m.Params})
+}
+
+// pluginNote records a note about one Kong plugin; reason, when set, says
+// why it could not be translated.
+func (it *Item) pluginNote(level, plugin string, m i18n.Message, reason *i18n.Message) {
+	text := plugin + ": " + m.String()
+	if reason != nil {
+		text = plugin + ": " + reason.String() + " (" + m.String() + ")"
+	}
+	it.addNote(Note{Level: level, Message: text, Code: m.Code, Params: m.Params, Plugin: plugin, Reason: reason})
+}
+
+func (it *Item) addNote(n Note) {
+	it.Notes = append(it.Notes, n)
+	level := n.Level
 	if level == LevelError {
 		it.Blocked = true
 	}
@@ -277,7 +300,7 @@ func (t *translator) assignIDs() {
 
 func (t *translator) checkID(it *Item) bool {
 	if other, ok := t.collisions[it.KongID]; ok {
-		it.note(LevelError, "o ID gerado no APISIX colide com o de %q; renomeie no Kong ou use a estratégia de ID do Kong", other)
+		it.note(LevelError, i18n.M("kong.note.id_collision", "the generated APISIX ID collides with the one of '{other}'; rename it in Kong or use the Kong ID strategy", "other", other))
 		return false
 	}
 	return true
@@ -335,10 +358,10 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 
 	scheme, ok := schemes[s.Protocol]
 	if !ok {
-		svc.note(LevelError, "protocolo %q (TCP/UDP/TLS) usa stream_routes no APISIX; não suportado pela migração", s.Protocol)
+		svc.note(LevelError, i18n.M("kong.note.service_stream_protocol", "protocol '{protocol}' (TCP/UDP/TLS) uses stream_routes in APISIX; not supported by the migration", "protocol", s.Protocol))
 	}
 	if s.Enabled != nil && !*s.Enabled {
-		svc.note(LevelWarn, "service desabilitado no Kong: as rotas serão criadas desabilitadas")
+		svc.note(LevelWarn, i18n.M("kong.note.service_disabled", "service disabled in Kong: its routes will be created disabled"))
 	}
 
 	body := map[string]any{"scheme": scheme, "labels": t.labels(s.ID)}
@@ -352,7 +375,7 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 		body["tls"] = map[string]any{"verify": *s.TLSVerify}
 	}
 	if s.ClientCertificate != nil {
-		up.note(LevelWarn, "o service usa certificado de cliente (mTLS) no Kong: configure tls.client_cert_id no upstream")
+		up.note(LevelWarn, i18n.M("kong.note.service_client_cert", "the service uses a client certificate (mTLS) in Kong: set tls.client_cert_id on the upstream"))
 	}
 
 	// preserve_host is per route in Kong and pass_host per upstream in APISIX.
@@ -366,8 +389,7 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 	// Strict majority: on a tie, keep Kong's default (preserve_host=false).
 	passHost := preserve*2 > len(routes)
 	if preserve > 0 && preserve < len(routes) {
-		up.note(LevelWarn, "%d de %d rotas usam preserve_host; no APISIX isso é definido no upstream (pass_host=%s para todas)",
-			preserve, len(routes), map[bool]string{true: "pass", false: "node"}[passHost])
+		up.note(LevelWarn, i18n.M("kong.note.preserve_host_mixed", "{count} of {total} routes use preserve_host; in APISIX this is set on the upstream (pass_host={pass_host} for all)", "count", preserve, "total", len(routes), "pass_host", map[bool]string{true: "pass", false: "node"}[passHost]))
 	}
 
 	if ku := t.snap.upstreamByName[s.Host]; ku != nil {
@@ -393,7 +415,7 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 			// Kong sent the original host; keep it.
 			body["pass_host"] = "rewrite"
 			body["upstream_host"] = s.Host
-			up.note(LevelInfo, "host reescrito de %s para %s; o header Host continua %s", s.Host, up.Detail, s.Host)
+			up.note(LevelInfo, i18n.M("kong.note.host_rewritten", "host rewritten from {from} to {to}; the Host header stays {from_header}", "from", s.Host, "to", up.Detail, "from_header", s.Host))
 		default:
 			body["pass_host"] = "node"
 		}
@@ -419,7 +441,7 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 	if pr, ok := plugins["proxy-rewrite"]; ok {
 		t.svcRewrite[s.ID] = pr.(map[string]any)
 		delete(plugins, "proxy-rewrite")
-		svc.note(LevelInfo, "a reescrita do request (proxy-rewrite) do service é aplicada em cada rota")
+		svc.note(LevelInfo, i18n.M("kong.note.service_rewrite_per_route", "the service request rewrite (proxy-rewrite) is applied to each route"))
 	}
 	if len(plugins) > 0 {
 		svcBody["plugins"] = plugins
@@ -427,10 +449,10 @@ func (t *translator) service(s *Service) (*Item, *Item) {
 	svc.Body = svcBody
 
 	if up.Blocked {
-		svc.note(LevelError, "o upstream não pode ser migrado")
+		svc.note(LevelError, i18n.M("kong.note.upstream_blocked", "the upstream cannot be migrated"))
 	}
 	if svc.Blocked && !up.Blocked {
-		up.note(LevelError, "o service não pode ser migrado")
+		up.note(LevelError, i18n.M("kong.note.service_blocked", "the service cannot be migrated"))
 	}
 	return svc, up
 }
@@ -439,10 +461,10 @@ var algorithms = map[string]string{"": "roundrobin", "round-robin": "roundrobin"
 
 func (t *translator) upstreamFromKong(ku *Upstream, body map[string]any, it *Item) {
 	if n := t.upstreamOf[ku.ID]; n > 1 {
-		it.note(LevelInfo, "o upstream %s do Kong é usado por %d services; cada um ganha um upstream no APISIX (health checks duplicados)", ku.Name, n)
+		it.note(LevelInfo, i18n.M("kong.note.upstream_shared", "Kong upstream {name} is used by {count} services; each gets its own APISIX upstream (duplicated health checks)", "name", ku.Name, "count", n))
 	}
 	if ku.ClientCertificate != nil {
-		it.note(LevelWarn, "o upstream usa certificado de cliente (mTLS) no Kong: configure tls.client_cert_id")
+		it.note(LevelWarn, i18n.M("kong.note.upstream_client_cert", "the upstream uses a client certificate (mTLS) in Kong: set tls.client_cert_id"))
 	}
 	if typ, ok := algorithms[ku.Algorithm]; ok {
 		body["type"] = typ
@@ -457,7 +479,7 @@ func (t *translator) upstreamFromKong(ku *Upstream, body map[string]any, it *Ite
 			body["hash_on"], body["key"] = "header", ku.HashOnHeader
 		case "cookie":
 			body["hash_on"], body["key"] = "cookie", ku.HashOnCookie
-			it.note(LevelWarn, "hash por cookie: o Kong cria o cookie %q quando ausente, o APISIX não", ku.HashOnCookie)
+			it.note(LevelWarn, i18n.M("kong.note.hash_cookie", "cookie hashing: Kong creates cookie '{cookie}' when missing, APISIX does not", "cookie", ku.HashOnCookie))
 		case "path":
 			body["hash_on"], body["key"] = "vars", "uri"
 		case "query_arg":
@@ -465,15 +487,15 @@ func (t *translator) upstreamFromKong(ku *Upstream, body map[string]any, it *Ite
 		default:
 			body["type"] = "roundrobin"
 			if ku.HashOn != "none" {
-				it.note(LevelWarn, "hash_on=%s não tem equivalente; usando roundrobin", ku.HashOn)
+				it.note(LevelWarn, i18n.M("kong.note.hash_on_unsupported", "hash_on={value} has no equivalent; using roundrobin", "value", ku.HashOn))
 			}
 		}
 		if ku.HashFallback != "" && ku.HashFallback != "none" {
-			it.note(LevelWarn, "hash_fallback=%s não tem equivalente no APISIX", ku.HashFallback)
+			it.note(LevelWarn, i18n.M("kong.note.hash_fallback_unsupported", "hash_fallback={value} has no equivalent in APISIX", "value", ku.HashFallback))
 		}
 	} else {
 		body["type"] = "roundrobin"
-		it.note(LevelWarn, "algoritmo %q desconhecido; usando roundrobin", ku.Algorithm)
+		it.note(LevelWarn, i18n.M("kong.note.algorithm_unknown", "unknown algorithm '{algorithm}'; using roundrobin", "algorithm", ku.Algorithm))
 	}
 
 	nodes := []any{}
@@ -481,7 +503,7 @@ func (t *translator) upstreamFromKong(ku *Upstream, body map[string]any, it *Ite
 	for _, tg := range t.snap.Targets[ku.ID] {
 		host, port, err := parseTarget(tg.Target)
 		if err != nil {
-			it.note(LevelError, "target inválido %q", tg.Target)
+			it.note(LevelError, i18n.M("kong.note.target_invalid", "invalid target '{target}'", "target", tg.Target))
 			continue
 		}
 		var rw bool
@@ -491,10 +513,10 @@ func (t *translator) upstreamFromKong(ku *Upstream, body map[string]any, it *Ite
 		nodes = append(nodes, map[string]any{"host": host, "port": port, "weight": tg.Weight})
 	}
 	if len(nodes) == 0 {
-		it.note(LevelWarn, "o upstream %s não tem targets no Kong", ku.Name)
+		it.note(LevelWarn, i18n.M("kong.note.upstream_no_targets", "upstream {name} has no targets in Kong", "name", ku.Name))
 	}
 	if rewrites > 0 {
-		it.note(LevelInfo, "%d targets com host reescrito", rewrites)
+		it.note(LevelInfo, i18n.M("kong.note.targets_rewritten", "{count} targets with a rewritten host", "count", rewrites))
 	}
 	body["nodes"] = nodes
 	if c := checks(ku.Healthchecks, it); c != nil {
@@ -527,12 +549,12 @@ func checks(hc map[string]any, it *Item) map[string]any {
 		return nil
 	}
 	if !activeOn {
-		it.note(LevelWarn, "o APISIX exige health check ativo junto com o passivo; o health check passivo não foi migrado")
+		it.note(LevelWarn, i18n.M("kong.note.passive_check_dropped", "APISIX requires an active health check alongside the passive one; the passive health check was not migrated"))
 		return nil
 	}
 	typ := str(active, "type")
 	if typ != "http" && typ != "https" && typ != "tcp" {
-		it.note(LevelWarn, "health check ativo do tipo %q não é suportado; não migrado", typ)
+		it.note(LevelWarn, i18n.M("kong.note.active_check_unsupported", "active health check of type '{type}' is not supported; not migrated", "type", typ))
 		return nil
 	}
 	counters := func(dst, src map[string]any, keys ...string) {
@@ -629,20 +651,20 @@ func (t *translator) route(r *Route) *Item {
 	if r.Service != nil {
 		svc = t.snap.services[r.Service.ID]
 		if svc == nil {
-			it.note(LevelError, "o service %s da rota não existe no Kong", r.Service.ID)
+			it.note(LevelError, i18n.M("kong.note.route_service_missing", "the route's service {id} does not exist in Kong", "id", r.Service.ID))
 		} else {
 			body["service_id"] = t.ids[svc.ID]
 			if si := t.svcItems[svc.ID]; si != nil && si.Blocked {
-				it.note(LevelError, "o service %s não pode ser migrado", si.KongName)
+				it.note(LevelError, i18n.M("kong.note.route_service_blocked", "service {name} cannot be migrated", "name", si.KongName))
 			}
 		}
 	}
 
 	if r.Expression != "" {
-		it.note(LevelError, "rotas por expressão (router expressions) não são suportadas")
+		it.note(LevelError, i18n.M("kong.note.expression_routes", "expression routes (router expressions) are not supported"))
 	}
 	if len(r.Sources) > 0 || len(r.Destinations) > 0 {
-		it.note(LevelError, "rotas por origem/destino (stream) não são suportadas")
+		it.note(LevelError, i18n.M("kong.note.stream_routes", "source/destination (stream) routes are not supported"))
 	}
 
 	var vars []any
@@ -654,7 +676,7 @@ func (t *translator) route(r *Route) *Item {
 		case "https", "grpcs", "wss":
 			hasHTTPS = true
 		default:
-			it.note(LevelError, "protocolo %q usa stream_routes no APISIX; não suportado", p)
+			it.note(LevelError, i18n.M("kong.note.route_stream_protocol", "protocol '{protocol}' uses stream_routes in APISIX; not supported", "protocol", p))
 		}
 	}
 	plugins := map[string]any{}
@@ -664,11 +686,11 @@ func (t *translator) route(r *Route) *Item {
 		if code == 301 || code == 302 || code == 307 || code == 308 {
 			plugins["redirect"] = map[string]any{"http_to_https": true}
 			if code != 301 {
-				it.note(LevelInfo, "redirecionamento para HTTPS usa 301 (GET) ou 308 no APISIX, em vez de %d", code)
+				it.note(LevelInfo, i18n.M("kong.note.https_redirect_code", "the HTTPS redirect uses 301 (GET) or 308 in APISIX instead of {code}", "code", code))
 			}
 		} else {
 			vars = append(vars, []any{"scheme", "==", "https"})
-			it.note(LevelInfo, "rota só HTTPS: requisições HTTP recebem 404 em vez de %d", code)
+			it.note(LevelInfo, i18n.M("kong.note.https_only", "HTTPS-only route: HTTP requests get 404 instead of {code}", "code", code))
 		}
 	case hasHTTP && !hasHTTPS:
 		vars = append(vars, []any{"scheme", "==", "http"})
@@ -682,7 +704,7 @@ func (t *translator) route(r *Route) *Item {
 		vars = append(vars, hostVars)
 	}
 	if len(r.SNIs) > 0 {
-		it.note(LevelWarn, "o APISIX não roteia HTTP por SNI; snis ignorados: %s", strings.Join(r.SNIs, ", "))
+		it.note(LevelWarn, i18n.M("kong.note.snis_ignored", "APISIX does not route HTTP by SNI; ignored SNIs: {snis}", "snis", strings.Join(r.SNIs, ", ")))
 	}
 	names := make([]string, 0, len(r.Headers))
 	for k := range r.Headers {
@@ -709,10 +731,10 @@ func (t *translator) route(r *Route) *Item {
 		body["priority"] = r.RegexPriority
 	}
 	if r.RequestBuffering != nil && !*r.RequestBuffering {
-		it.note(LevelWarn, "request_buffering=false não é migrado (configure proxy_request_buffering no APISIX)")
+		it.note(LevelWarn, i18n.M("kong.note.request_buffering", "request_buffering=false is not migrated (configure proxy_request_buffering in APISIX)"))
 	}
 	if r.ResponseBuffering != nil && !*r.ResponseBuffering {
-		it.note(LevelInfo, "response_buffering=false: use o plugin proxy-buffering se necessário")
+		it.note(LevelInfo, i18n.M("kong.note.response_buffering", "response_buffering=false: use the proxy-buffering plugin if needed"))
 	}
 
 	status := 1
@@ -749,7 +771,7 @@ func (t *translator) route(r *Route) *Item {
 		body["plugins"] = plugins
 	}
 	if svc == nil && len(plugins) == 0 {
-		it.note(LevelError, "rota sem service no Kong e sem plugin que responda a requisição")
+		it.note(LevelError, i18n.M("kong.note.route_no_target", "route without a Kong service and without a plugin that answers the request"))
 	}
 	it.Body = body
 	return it
@@ -779,7 +801,7 @@ func (t *translator) hosts(r *Route, body map[string]any, it *Item) any {
 	hosts := make([]string, 0, len(r.Hosts))
 	for _, h := range r.Hosts {
 		if hp, _, err := net.SplitHostPort(h); err == nil {
-			it.note(LevelWarn, "o APISIX não casa a porta no host; %q vira %q", h, hp)
+			it.note(LevelWarn, i18n.M("kong.note.host_port_dropped", "APISIX does not match the port in the host; '{host}' becomes '{result}'", "host", h, "result", hp))
 			h = hp
 		}
 		if strings.HasSuffix(h, ".*") {
@@ -865,7 +887,7 @@ func paths(r *Route, svcPath string, it *Item) (uris []string, vars any, regexUR
 		}
 	}
 	if r.PathHandling == "v1" && r.StripPath && svcPath != "" && svcPath != "/" {
-		it.note(LevelInfo, "path_handling v1: confira a junção do path do service com o da rota")
+		it.note(LevelInfo, i18n.M("kong.note.path_handling_v1", "path_handling v1: check how the service path is joined with the route path"))
 	}
 
 	root := svcPath == "" || svcPath == "/"
@@ -901,7 +923,7 @@ func paths(r *Route, svcPath string, it *Item) (uris []string, vars any, regexUR
 		)
 	}
 	if anyRegex {
-		it.note(LevelInfo, "path regex com strip_path: confira a reescrita gerada (regex_uri)")
+		it.note(LevelInfo, i18n.M("kong.note.regex_strip_path", "regex path with strip_path: check the generated rewrite (regex_uri)"))
 	}
 	return
 }
@@ -977,10 +999,10 @@ func (t *translator) consumer(c *Consumer) (*Item, []*Item) {
 	}
 	t.checkID(it)
 	if username == "" && !it.Blocked {
-		it.note(LevelError, "consumer sem username nem custom_id")
+		it.note(LevelError, i18n.M("kong.note.consumer_no_name", "consumer without username or custom_id"))
 	}
 	if username != "" && username != name {
-		it.note(LevelInfo, "username ajustado para o padrão do APISIX: %q → %q", name, username)
+		it.note(LevelInfo, i18n.M("kong.note.username_adjusted", "username adjusted to the APISIX format: '{from}' → '{to}'", "from", name, "to", username))
 	}
 
 	var extra []string
@@ -1008,7 +1030,7 @@ func (t *translator) consumer(c *Consumer) (*Item, []*Item) {
 			ci.Body = map[string]any{"plugins": map[string]any{plugin: conf}, "labels": t.labels(kongID), "desc": desc(plugin, nil)}
 		}
 		if it.Blocked {
-			ci.note(LevelError, "o consumer não pode ser migrado")
+			ci.note(LevelError, i18n.M("kong.note.consumer_blocked", "the consumer cannot be migrated"))
 		}
 		creds = append(creds, ci)
 		return ci
@@ -1017,14 +1039,14 @@ func (t *translator) consumer(c *Consumer) (*Item, []*Item) {
 		if k.Consumer.ID == c.ID {
 			ci := cred(k.ID, "key-auth", "", map[string]any{"key": k.Key})
 			if k.TTL > 0 {
-				ci.note(LevelWarn, "a chave expira no Kong (ttl %ds); no APISIX ela não expira", k.TTL)
+				ci.note(LevelWarn, i18n.M("kong.note.key_ttl", "the key expires in Kong (ttl {ttl}s); in APISIX it does not expire", "ttl", k.TTL))
 			}
 		}
 	}
 	for _, b := range t.snap.BasicAuths {
 		if b.Consumer.ID == c.ID {
 			ci := cred(b.ID, "basic-auth", b.Username, nil)
-			ci.note(LevelError, "o Kong guarda só o hash da senha; cadastre uma nova senha para %q no APISIX", b.Username)
+			ci.note(LevelError, i18n.M("kong.note.basic_auth_password", "Kong stores only the password hash; set a new password for '{username}' in APISIX", "username", b.Username))
 		}
 	}
 	for _, j := range t.snap.JWTs {
@@ -1040,9 +1062,9 @@ func (t *translator) consumer(c *Consumer) (*Item, []*Item) {
 		}
 		ci := cred(j.ID, "jwt-auth", j.Key+" · "+alg, conf)
 		if !jwtAlgorithms[alg] {
-			ci.note(LevelError, "algoritmo %s não é suportado pelo jwt-auth do APISIX", alg)
+			ci.note(LevelError, i18n.M("kong.note.jwt_algorithm", "algorithm {algorithm} is not supported by APISIX jwt-auth", "algorithm", alg))
 		} else if !strings.HasPrefix(alg, "HS") && j.RSAPublicKey == "" {
-			ci.note(LevelError, "credencial %s sem chave pública", alg)
+			ci.note(LevelError, i18n.M("kong.note.jwt_no_public_key", "{algorithm} credential without a public key", "algorithm", alg))
 		}
 	}
 	for _, h := range t.snap.HMACAuths {
@@ -1070,7 +1092,7 @@ func groupLabels(groups []string) []string {
 // ---- global plugins ----
 
 func (t *translator) global(p *Plugin) *Item {
-	it := &Item{Kind: KindGlobal, KongID: p.ID, KongName: p.Name, Detail: "plugin global", Resource: "global_rules", ID: t.ids[p.ID], Notes: []Note{}}
+	it := &Item{Kind: KindGlobal, KongID: p.ID, KongName: p.Name, Detail: "global plugin", Resource: "global_rules", ID: t.ids[p.ID], Notes: []Note{}}
 	t.checkID(it)
 	plugins := t.plugins(it, pluginScope{level: "global"}, func(x *Plugin) bool { return x.ID == p.ID })
 	if len(plugins) == 0 && !it.Blocked {

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 // A small Kong configuration, as returned by the Admin API.
@@ -97,9 +99,15 @@ func expect(t *testing.T, it *Item, path string, want any) {
 	}
 }
 
-func hasNote(it *Item, level, substr string) bool {
+// hasNote reports whether it has a note with this level and i18n code
+// (the plugin name is matched too when given as "plugin/code").
+func hasNote(it *Item, level, code string) bool {
+	plugin, c, scoped := strings.Cut(code, "/")
+	if !scoped {
+		plugin, c = "", code
+	}
 	for _, n := range it.Notes {
-		if n.Level == level && strings.Contains(n.Message, substr) {
+		if n.Level == level && n.Code == c && (plugin == "" || n.Plugin == plugin) {
 			return true
 		}
 	}
@@ -129,7 +137,7 @@ func TestServiceAndUpstream(t *testing.T) {
 	}
 	// One of the two routes preserves the host: a tie keeps Kong's default.
 	expect(t, up, "pass_host", "node")
-	if !hasNote(up, LevelWarn, "preserve_host") {
+	if !hasNote(up, LevelWarn, "kong.note.preserve_host_mixed") {
 		t.Error("diverging preserve_host must be reported")
 	}
 	expect(t, up, "labels.kong-id", "s1")
@@ -207,7 +215,7 @@ func TestRootServicePathAndCustomRule(t *testing.T) {
 
 	// The disabled cors plugin is skipped by default.
 	svc := find(items, KindService, "s2")
-	if at(generic(svc.Body), "plugins") != nil || !hasNote(svc, LevelInfo, "desabilitado") {
+	if at(generic(svc.Body), "plugins") != nil || !hasNote(svc, LevelInfo, "kong.note.plugin_disabled") {
 		t.Errorf("disabled plugin: %+v", svc)
 	}
 }
@@ -215,14 +223,14 @@ func TestRootServicePathAndCustomRule(t *testing.T) {
 func TestUnsupportedPluginPolicy(t *testing.T) {
 	items := Translate(snapshot(t), DefaultSettings(), Selection{Routes: []string{"r3"}})
 	r3 := find(items, KindRoute, "r3")
-	if !r3.Blocked || !hasNote(r3, LevelError, "meu-plugin-custom") {
+	if !r3.Blocked || !hasNote(r3, LevelError, "meu-plugin-custom/kong.note.plugin_blocks") {
 		t.Fatalf("unknown plugin must block by default: %+v", r3.Notes)
 	}
 
 	set := DefaultSettings()
 	set.UnsupportedPlugins = "skip"
 	r3 = find(Translate(snapshot(t), set, Selection{Routes: []string{"r3"}}), KindRoute, "r3")
-	if r3.Blocked || !hasNote(r3, LevelWarn, "migrado sem o plugin") {
+	if r3.Blocked || !hasNote(r3, LevelWarn, "kong.note.plugin_skipped") {
 		t.Fatalf("skip policy: %+v", r3.Notes)
 	}
 
@@ -266,7 +274,7 @@ func TestIDCollision(t *testing.T) {
 	s := snapshot(t)
 	s.Routes = append(s.Routes, Route{ID: "r9", Name: "pag api", Paths: []string{"/x"}, Protocols: []string{"http"}, Service: &Ref{ID: "s1"}})
 	items := Translate(s, DefaultSettings(), Selection{Routes: []string{"r9"}})
-	if r := find(items, KindRoute, "r9"); !r.Blocked || !hasNote(r, LevelError, "colide") {
+	if r := find(items, KindRoute, "r9"); !r.Blocked || !hasNote(r, LevelError, "kong.note.id_collision") {
 		t.Fatalf("expected collision: %+v", r.Notes)
 	}
 	set := DefaultSettings()
@@ -334,9 +342,17 @@ func TestSettingsValidate(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected errors")
 	}
-	for _, want := range []string{"prefixo", "reservado", "espaços", "destino inválido", "plugin do APISIX"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("missing %q in %v", want, err)
+	msgs, ok := i18n.Messages(err)
+	if !ok {
+		t.Fatalf("validation errors must carry user messages: %v", err)
+	}
+	codes := map[string]bool{}
+	for _, m := range msgs {
+		codes[m.Code] = true
+	}
+	for _, want := range []string{"kong.settings.id_prefix", "kong.settings.label_reserved", "kong.settings.label_value", "kong.settings.rewrite_to", "kong.settings.rule_apisix_plugin"} {
+		if !codes[want] {
+			t.Errorf("missing %q in %v", want, msgs)
 		}
 	}
 }

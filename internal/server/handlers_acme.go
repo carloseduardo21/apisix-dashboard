@@ -10,6 +10,7 @@ import (
 
 	"github.com/carloseduardo21/apisix-dashboard/internal/acme"
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
@@ -58,7 +59,7 @@ func (p *principal) actor() acme.Actor { return acme.Actor{Name: p.user.Username
 // acmeOff answers when automatic issuance is not configured.
 func (s *Server) acmeOff(w http.ResponseWriter) bool {
 	if s.ACME == nil {
-		writeError(w, http.StatusConflict, "emissão automática desativada: defina DASH_ACME_CLOUDFLARE_API_TOKEN")
+		writeError(w, http.StatusConflict, "acme.disabled", "automatic issuance is disabled: set DASH_ACME_CLOUDFLARE_API_TOKEN")
 		return true
 	}
 	return false
@@ -97,14 +98,14 @@ func (s *Server) handleACMEProvider(w http.ResponseWriter, r *http.Request, p *p
 	ctx := r.Context()
 	out := map[string]any{"token_ok": false, "zones": []any{}}
 	if err := s.ACME.DNS.Verify(ctx); err != nil {
-		out["error"] = err.Error()
+		setMessage(out, i18n.M("acme.dns_provider_error", "DNS provider error: {detail}", "detail", err.Error()))
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
 	out["token_ok"] = true
 	zones, err := s.ACME.DNS.Zones(ctx)
 	if err != nil {
-		out["error"] = err.Error()
+		setMessage(out, i18n.M("acme.dns_provider_error", "DNS provider error: {detail}", "detail", err.Error()))
 	} else {
 		list := make([]map[string]string, 0, len(zones))
 		for _, z := range zones {
@@ -133,21 +134,21 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 	ctx := r.Context()
 	domains, err := acme.NormalizeDomains(req.Domains)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeUserError(w, http.StatusBadRequest, err)
 		return
 	}
 	if req.Environment == "" {
 		req.Environment = acme.EnvProduction
 	}
 	if req.Environment != acme.EnvProduction && req.Environment != acme.EnvStaging {
-		writeError(w, http.StatusBadRequest, "ambiente deve ser production ou staging")
+		writeError(w, http.StatusBadRequest, "acme.invalid_environment", "environment must be production or staging")
 		return
 	}
 	if req.KeyType == "" {
 		req.KeyType = acme.KeyEC256 // gitleaks:allow (constant name, not a secret)
 	}
 	if req.KeyType != acme.KeyEC256 && req.KeyType != acme.KeyRSA2048 {
-		writeError(w, http.StatusBadRequest, "tipo de chave deve ser ec256 ou rsa2048")
+		writeError(w, http.StatusBadRequest, "acme.invalid_key_type", "key type must be ec256 or rsa2048")
 		return
 	}
 	req.SSLID = strings.TrimSpace(req.SSLID)
@@ -155,13 +156,15 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 		req.SSLID = acme.DefaultSSLID(domains[0])
 	}
 	if !acme.ValidSSLID(req.SSLID) {
-		writeError(w, http.StatusBadRequest, "ID do SSL inválido: use letras, números, '.', '_' ou '-' (até 64)")
+		writeError(w, http.StatusBadRequest, "acme.invalid_ssl_id", "invalid SSL ID: use up to 64 letters, digits, '.', '_' or '-'")
 		return
 	}
 	// Fail early when the token cannot edit a zone of these domains.
 	for _, d := range domains {
 		if _, err := s.ACME.DNS.ZoneFor(ctx, "_acme-challenge."+strings.TrimPrefix(d, "*.")); err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
+			if !writeUserError(w, http.StatusBadRequest, err) {
+				writeMessages(w, http.StatusBadRequest, i18n.M("acme.dns_provider_error", "DNS provider error: {detail}", "detail", err.Error()))
+			}
 			return
 		}
 	}
@@ -173,7 +176,7 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	if resp.OK() && !req.Replace {
-		writeError(w, http.StatusConflict, "já existe um SSL com o ID "+req.SSLID+" no APISIX; escolha outro ID ou marque a opção de substituí-lo")
+		writeError(w, http.StatusConflict, "acme.ssl_id_exists", "an SSL with ID {id} already exists in APISIX; choose another ID or enable replacing it", "id", req.SSLID)
 		return
 	}
 
@@ -184,7 +187,7 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 	}
 	if err := s.Store.CreateCertificate(ctx, c); err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			writeError(w, http.StatusConflict, "o SSL "+req.SSLID+" já é gerenciado por outro certificado automático")
+			writeError(w, http.StatusConflict, "acme.ssl_id_managed", "SSL {id} is already managed by another automatic certificate", "id", req.SSLID)
 			return
 		}
 		internalError(w, err)
@@ -192,7 +195,7 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 	}
 	detail := strings.Join(domains, ", ") + " · " + req.Environment + " · " + req.KeyType
 	if resp.OK() {
-		detail += " · substitui o SSL existente na próxima emissão"
+		detail += " · replaces the existing SSL at the next issuance"
 	}
 	s.Audit.Record(ctx, store.AuditEvent{
 		Actor: p.user.Username, IP: p.meta.IP, Action: "acme.create", Resource: "ssls", ResourceID: c.SSLID,
@@ -209,7 +212,7 @@ func (s *Server) handleCreateCertificate(w http.ResponseWriter, r *http.Request,
 func (s *Server) certFromPath(w http.ResponseWriter, r *http.Request) (*store.Certificate, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "não encontrado")
+		notFound(w)
 		return nil, false
 	}
 	c, err := s.Store.GetCertificate(r.Context(), id)
@@ -230,7 +233,7 @@ func (s *Server) handleIssueCertificate(w http.ResponseWriter, r *http.Request, 
 	}
 	if err := s.ACME.Trigger(r.Context(), c.ID, p.actor()); err != nil {
 		if errors.Is(err, acme.ErrBusy) {
-			writeError(w, http.StatusConflict, err.Error())
+			writeUserError(w, http.StatusConflict, err)
 			return
 		}
 		internalError(w, err)
@@ -250,9 +253,11 @@ func (s *Server) handleDeleteCertificate(w http.ResponseWriter, r *http.Request,
 	err := s.ACME.Release(r.Context(), c, r.URL.Query().Get("delete_ssl") == "true", p.actor())
 	switch {
 	case errors.Is(err, acme.ErrBusy):
-		writeError(w, http.StatusConflict, err.Error())
+		writeUserError(w, http.StatusConflict, err)
 	case err != nil:
-		writeError(w, http.StatusBadGateway, err.Error())
+		if !writeUserError(w, http.StatusBadGateway, err) {
+			badGateway(w, err)
+		}
 	default:
 		w.WriteHeader(http.StatusNoContent)
 	}

@@ -16,7 +16,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		writeError(w, http.StatusBadRequest, "informe usuário e senha")
+		writeError(w, http.StatusBadRequest, "auth.credentials_required", "username and password are required")
 		return
 	}
 	// Never reuse a session that existed before login (session fixation).

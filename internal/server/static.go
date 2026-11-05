@@ -13,11 +13,11 @@ func spaHandler(fsys fs.FS) http.Handler {
 	files := http.FileServerFS(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			writeError(w, http.StatusMethodNotAllowed, "método não permitido")
+			writeError(w, http.StatusMethodNotAllowed, "api.method_not_allowed", "method not allowed")
 			return
 		}
 		if _, err := fs.Stat(fsys, "index.html"); err != nil {
-			http.Error(w, "frontend não incluído neste binário (execute make build)", http.StatusServiceUnavailable)
+			http.Error(w, "frontend not included in this binary (run make build)", http.StatusServiceUnavailable)
 			return
 		}
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")

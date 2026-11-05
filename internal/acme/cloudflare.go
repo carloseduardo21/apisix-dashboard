@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 // Cloudflare manages the _acme-challenge TXT records through the Cloudflare
@@ -79,7 +81,7 @@ func (c *Cloudflare) call(ctx context.Context, method, path string, query url.Va
 	}
 	var env cfEnvelope
 	if err := json.Unmarshal(raw, &env); err != nil {
-		return fmt.Errorf("cloudflare: HTTP %d com resposta inválida", resp.StatusCode)
+		return fmt.Errorf("cloudflare: HTTP %d with an invalid response", resp.StatusCode)
 	}
 	if !env.Success || resp.StatusCode >= 300 {
 		msgs := make([]string, 0, len(env.Errors))
@@ -106,7 +108,7 @@ func (c *Cloudflare) Verify(ctx context.Context) error {
 		return err
 	}
 	if r.Status != "active" {
-		return fmt.Errorf("cloudflare: token com status %q", r.Status)
+		return fmt.Errorf("cloudflare: token status %q", r.Status)
 	}
 	return nil
 }
@@ -141,7 +143,7 @@ func (c *Cloudflare) ZoneFor(ctx context.Context, fqdn string) (Zone, error) {
 			return zones[0], nil
 		}
 	}
-	return Zone{}, fmt.Errorf("nenhuma zona da Cloudflare acessível pelo token contém %s", fqdn)
+	return Zone{}, i18n.E("acme.no_zone", "no Cloudflare zone reachable with the token contains {fqdn}", "fqdn", fqdn)
 }
 
 // CreateTXT creates a TXT record and returns a reference for DeleteTXT.
@@ -155,13 +157,13 @@ func (c *Cloudflare) CreateTXT(ctx context.Context, fqdn, value string) (string,
 	}
 	body := map[string]any{
 		"type": "TXT", "name": strings.TrimSuffix(fqdn, "."), "content": value, "ttl": 60,
-		"comment": "apisix-dashboard: desafio ACME temporário",
+		"comment": "apisix-dashboard: temporary ACME challenge",
 	}
 	if err := c.call(ctx, http.MethodPost, "/zones/"+url.PathEscape(zone.ID)+"/dns_records", nil, body, &rec); err != nil {
 		return "", err
 	}
 	if rec.ID == "" {
-		return "", errors.New("cloudflare: registro criado sem id")
+		return "", errors.New("cloudflare: record created without an id")
 	}
 	return zone.ID + "/" + rec.ID, nil
 }
@@ -169,7 +171,7 @@ func (c *Cloudflare) CreateTXT(ctx context.Context, fqdn, value string) (string,
 func (c *Cloudflare) DeleteTXT(ctx context.Context, ref string) error {
 	zoneID, recID, ok := strings.Cut(ref, "/")
 	if !ok {
-		return fmt.Errorf("cloudflare: referência inválida %q", ref)
+		return fmt.Errorf("cloudflare: invalid reference %q", ref)
 	}
 	return c.call(ctx, http.MethodDelete, "/zones/"+url.PathEscape(zoneID)+"/dns_records/"+url.PathEscape(recID), nil, nil, nil)
 }

@@ -84,7 +84,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request, p *pri
 func (s *Server) targetUser(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "não encontrado")
+		notFound(w)
 		return nil, false
 	}
 	u, err := s.Store.GetUserByID(r.Context(), id)
@@ -118,7 +118,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request, p *pri
 		return
 	}
 	if u.ID == p.user.ID {
-		writeError(w, http.StatusBadRequest, "não é possível alterar o próprio perfil ou status")
+		writeError(w, http.StatusBadRequest, "users.cannot_change_self", "you cannot change your own role or status")
 		return
 	}
 	demoting := (req.Role != nil && *req.Role != auth.RoleAdmin) || (req.Disabled != nil && *req.Disabled)
@@ -129,7 +129,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request, p *pri
 			return
 		}
 		if !ok {
-			writeError(w, http.StatusBadRequest, "é necessário manter pelo menos um administrador ativo")
+			writeError(w, http.StatusBadRequest, "users.last_admin", "at least one active administrator is required")
 			return
 		}
 	}
@@ -137,7 +137,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request, p *pri
 	detail := ""
 	if req.Role != nil {
 		if !auth.ValidRole(*req.Role) {
-			writeError(w, http.StatusBadRequest, "perfil inválido")
+			writeError(w, http.StatusBadRequest, "users.invalid_role", "invalid role")
 			return
 		}
 		detail += "role " + u.Role + "->" + *req.Role + " "
@@ -167,14 +167,14 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, p *pri
 		return
 	}
 	if u.ID == p.user.ID {
-		writeError(w, http.StatusBadRequest, "não é possível excluir o próprio usuário")
+		writeError(w, http.StatusBadRequest, "users.cannot_delete_self", "you cannot delete your own user")
 		return
 	}
 	if ok, err := s.keepsAnAdmin(r.Context(), u); err != nil {
 		internalError(w, err)
 		return
 	} else if !ok {
-		writeError(w, http.StatusBadRequest, "é necessário manter pelo menos um administrador ativo")
+		writeError(w, http.StatusBadRequest, "users.last_admin", "at least one active administrator is required")
 		return
 	}
 	if err := s.Store.DeleteUser(r.Context(), u.ID); err != nil {

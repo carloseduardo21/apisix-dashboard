@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/kong"
 )
 
@@ -16,7 +17,7 @@ func (p *principal) kongActor() kong.Actor { return kong.Actor{Name: p.user.User
 // kongOff answers when the migration is not configured.
 func (s *Server) kongOff(w http.ResponseWriter) bool {
 	if s.Kong == nil {
-		writeError(w, http.StatusConflict, "migração do Kong desativada: defina DASH_KONG_ADMIN_URL")
+		writeError(w, http.StatusConflict, "kong.disabled", "Kong migration is disabled: set DASH_KONG_ADMIN_URL")
 		return true
 	}
 	return false
@@ -26,13 +27,13 @@ func kongError(w http.ResponseWriter, err error) {
 	var ve *kong.ValidationError
 	switch {
 	case errors.As(err, &ve):
-		writeError(w, http.StatusBadRequest, ve.Error())
+		writeUserError(w, http.StatusBadRequest, err)
 	case errors.Is(err, kong.ErrBusy), errors.Is(err, kong.ErrStale):
-		writeError(w, http.StatusConflict, err.Error())
+		writeUserError(w, http.StatusConflict, err)
 	case strings.HasPrefix(err.Error(), "kong: "), strings.HasPrefix(err.Error(), "apisix: "):
 		// Errors from the Admin APIs carry only paths and status codes.
 		slog.Warn("kong migration", "err", err)
-		writeError(w, http.StatusBadGateway, err.Error())
+		writeError(w, http.StatusBadGateway, "kong.admin_api_error", "Admin API error: {detail}", "detail", err.Error())
 	default:
 		internalError(w, err)
 	}
@@ -53,7 +54,7 @@ func (s *Server) handleKong(w http.ResponseWriter, r *http.Request, p *principal
 	defer cancel()
 	if info, err := s.Kong.Kong.Info(ctx); err != nil {
 		slog.Warn("kong admin api unreachable", "err", err)
-		out["error"] = "Admin API do Kong inacessível: " + err.Error()
+		setMessage(out, i18n.M("kong.unreachable", "could not reach the Kong Admin API: {detail}", "detail", err.Error()))
 	} else {
 		out["info"] = info
 	}
@@ -115,7 +116,7 @@ func (s *Server) handleKongPlan(w http.ResponseWriter, r *http.Request, p *princ
 		return
 	}
 	if sel.Empty() {
-		writeError(w, http.StatusBadRequest, "selecione ao menos um item")
+		writeError(w, http.StatusBadRequest, "kong.selection_empty", "select at least one item")
 		return
 	}
 	plan, err := s.Kong.Plan(r.Context(), &sel)
@@ -138,7 +139,7 @@ func (s *Server) handleKongApply(w http.ResponseWriter, r *http.Request, p *prin
 		return
 	}
 	if req.Selection.Empty() || req.Hash == "" {
-		writeError(w, http.StatusBadRequest, "selecione os itens e gere a pré-visualização antes de aplicar")
+		writeError(w, http.StatusBadRequest, "kong.preview_required", "select the items and generate the preview before applying")
 		return
 	}
 	job, err := s.Kong.Apply(r.Context(), req.Selection, req.Hash, p.kongActor())

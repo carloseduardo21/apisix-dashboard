@@ -34,6 +34,7 @@ import (
 
 	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/secure"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
@@ -59,7 +60,7 @@ const (
 	checkInterval = time.Hour
 )
 
-var ErrBusy = errors.New("emissão já em andamento para este certificado")
+var ErrBusy = i18n.E("acme.busy", "an issuance is already running for this certificate")
 
 // Actor identifies who triggered an operation, for the audit trail.
 type Actor struct {
@@ -68,7 +69,7 @@ type Actor struct {
 }
 
 // AutoRenew is the actor of scheduled renewals.
-var AutoRenew = Actor{Name: "acme:renovação-automática"}
+var AutoRenew = Actor{Name: "acme:auto-renewal"}
 
 type Options struct {
 	Store  *store.Store
@@ -113,7 +114,7 @@ func (m *Manager) Run(ctx context.Context) {
 	for _, c := range certs {
 		if c.Status == StatusIssuing {
 			c.Status = StatusError
-			c.LastError = "emissão interrompida pelo reinício da dashboard"
+			c.LastError = "issuance interrupted by a dashboard restart"
 			c.NextAttemptAt = time.Now()
 			c.UpdatedAt = time.Now()
 			if err := m.Store.UpdateCertificate(ctx, c); err != nil {
@@ -207,13 +208,13 @@ func (m *Manager) start(ctx context.Context, c *store.Certificate, who Actor, ma
 
 	c.Status = StatusIssuing
 	c.LastError = ""
-	reason := "renovação automática"
+	start := i18n.M("acme.log.started_renewal", "Issuance started (automatic renewal)")
 	if manual {
-		reason = "solicitada por " + who.Name
+		start = i18n.M("acme.log.started_manual", "Issuance started (requested by {user})", "user", who.Name)
 	} else if c.NotAfter.IsZero() {
-		reason = "primeira emissão"
+		start = i18n.M("acme.log.started_first", "Issuance started (first issuance)")
 	}
-	c.Log, _ = json.Marshal([]logEntry{{Time: time.Now(), Level: "info", Message: "Emissão iniciada (" + reason + ")"}})
+	c.Log, _ = json.Marshal([]logEntry{newLogEntry("info", start)})
 	c.UpdatedAt = time.Now()
 	if err := m.Store.UpdateCertificate(ctx, c); err != nil {
 		m.release(c.ID)
@@ -228,10 +229,19 @@ func (m *Manager) release(id int64) {
 	m.mu.Unlock()
 }
 
+// logEntry is one step of an issuance, shown live in the UI. Message is the
+// English rendering; Code/Params let the UI translate it (older entries
+// stored before i18n only have Message).
 type logEntry struct {
-	Time    time.Time `json:"ts"`
-	Level   string    `json:"level"`
-	Message string    `json:"message"`
+	Time    time.Time         `json:"ts"`
+	Level   string            `json:"level"`
+	Message string            `json:"message"`
+	Code    string            `json:"code,omitempty"`
+	Params  map[string]string `json:"params,omitempty"`
+}
+
+func newLogEntry(level string, m i18n.Message) logEntry {
+	return logEntry{Time: time.Now(), Level: level, Message: m.String(), Code: m.Code, Params: m.Params}
 }
 
 // runLog collects the steps of an issuance and saves them as they happen.
@@ -241,8 +251,8 @@ type runLog struct {
 	entries []logEntry
 }
 
-func (l *runLog) add(level, format string, args ...any) {
-	l.entries = append(l.entries, logEntry{Time: time.Now(), Level: level, Message: fmt.Sprintf(format, args...)})
+func (l *runLog) add(level string, m i18n.Message) {
+	l.entries = append(l.entries, newLogEntry(level, m))
 	l.cert.Log, _ = json.Marshal(l.entries)
 	l.cert.UpdatedAt = time.Now()
 	if err := l.m.Store.UpdateCertificate(context.WithoutCancel(l.m.ctx), l.cert); err != nil {
@@ -250,8 +260,8 @@ func (l *runLog) add(level, format string, args ...any) {
 	}
 }
 
-func (l *runLog) info(format string, args ...any) { l.add("info", format, args...) }
-func (l *runLog) warn(format string, args ...any) { l.add("warn", format, args...) }
+func (l *runLog) info(code, template string, kv ...any) { l.add("info", i18n.M(code, template, kv...)) }
+func (l *runLog) warn(code, template string, kv ...any) { l.add("warn", i18n.M(code, template, kv...)) }
 
 func (m *Manager) issue(ctx context.Context, id int64, who Actor) {
 	m.issueMu.Lock()
@@ -282,7 +292,7 @@ func (m *Manager) issue(ctx context.Context, id int64, who Actor) {
 		c.Status = StatusError
 		c.LastError = err.Error()
 		c.NextAttemptAt = now.Add(backoff(c.Failures))
-		run.add("error", "Falhou: %s. Nova tentativa automática em %s.", err, c.NextAttemptAt.Format("02/01 15:04"))
+		run.add("error", i18n.M("acme.log.failed", "Failed: {error}. Automatic retry at {retry_at}.", "error", err.Error(), "retry_at", c.NextAttemptAt.UTC().Format(time.RFC3339)))
 		m.Audit.Record(ctx, store.AuditEvent{
 			Actor: who.Name, IP: who.IP, Action: "acme.issue", Resource: "ssls", ResourceID: c.SSLID,
 			Outcome: audit.Failure, Detail: strings.Join(c.Domains, ", ") + ": " + truncate(err.Error(), 500),
@@ -298,7 +308,7 @@ func (m *Manager) issue(ctx context.Context, id int64, who Actor) {
 	c.Fingerprint = res.fingerprint
 	c.Issuer = res.leaf.Issuer.CommonName
 	c.IssuedAt = now
-	run.info("Concluído: válido até %s, renovação prevista para %s.", c.NotAfter.Format("02/01/2006"), m.RenewAt(c).Format("02/01/2006"))
+	run.info("acme.log.done", "Done: valid until {not_after}, renewal planned for {renew_at}.", "not_after", c.NotAfter.Format(time.DateOnly), "renew_at", m.RenewAt(c).Format(time.DateOnly))
 	slog.Info("acme: certificate issued", "id", c.ID, "domains", c.Domains, "not_after", c.NotAfter)
 }
 
@@ -328,7 +338,7 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 	if err != nil {
 		return nil, fmt.Errorf("criar pedido: %w", err)
 	}
-	run.info("Pedido criado na CA (%s) para %s", c.Environment, strings.Join(c.Domains, ", "))
+	run.info("acme.log.order_created", "Order created at the CA ({environment}) for {domains}", "environment", c.Environment, "domains", strings.Join(c.Domains, ", "))
 
 	type pending struct {
 		authzURL string
@@ -344,22 +354,22 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 		defer cancel()
 		for _, ref := range records {
 			if err := m.DNS.DeleteTXT(cctx, ref); err != nil {
-				run.warn("Não foi possível remover um registro TXT temporário: %s", err)
+				run.warn("acme.log.txt_cleanup_failed", "Could not remove a temporary TXT record: {error}", "error", err.Error())
 			}
 		}
 		if len(records) > 0 {
-			run.info("Registros TXT temporários removidos")
+			run.info("acme.log.txt_cleaned", "Temporary TXT records removed")
 		}
 	}()
 
 	for _, u := range order.AuthzURLs {
 		z, err := client.GetAuthorization(ctx, u)
 		if err != nil {
-			return nil, fmt.Errorf("obter autorização: %w", err)
+			return nil, fmt.Errorf("get authorization: %w", err)
 		}
 		name := strings.TrimPrefix(z.Identifier.Value, "*.")
 		if z.Status == acme.StatusValid {
-			run.info("%s já está validado na CA", z.Identifier.Value)
+			run.info("acme.log.already_valid", "{domain} is already validated at the CA", "domain", z.Identifier.Value)
 			continue
 		}
 		var chal *acme.Challenge
@@ -369,7 +379,7 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 			}
 		}
 		if chal == nil {
-			return nil, fmt.Errorf("a CA não ofereceu o desafio dns-01 para %s", z.Identifier.Value)
+			return nil, fmt.Errorf("the CA did not offer the dns-01 challenge for %s", z.Identifier.Value)
 		}
 		value, err := client.DNS01ChallengeRecord(chal.Token)
 		if err != nil {
@@ -381,7 +391,7 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 			return nil, fmt.Errorf("criar TXT %s: %w", fqdn, err)
 		}
 		records = append(records, ref)
-		run.info("TXT %s criado na Cloudflare", fqdn)
+		run.info("acme.log.txt_created", "TXT {fqdn} created at Cloudflare", "fqdn", fqdn)
 		todo = append(todo, pending{authzURL: u, chal: chal, fqdn: fqdn, value: value})
 	}
 
@@ -395,16 +405,16 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 	}
 	for _, p := range todo {
 		if _, err := client.WaitAuthorization(ctx, p.authzURL); err != nil {
-			return nil, fmt.Errorf("validação de %s recusada pela CA: %w", p.fqdn, err)
+			return nil, fmt.Errorf("validation of %s rejected by the CA: %w", p.fqdn, err)
 		}
 	}
 	if len(todo) > 0 {
-		run.info("Desafio DNS validado pela CA")
+		run.info("acme.log.challenge_valid", "DNS challenge validated by the CA")
 	}
 
 	order, err = client.WaitOrder(ctx, order.URI)
 	if err != nil {
-		return nil, fmt.Errorf("pedido não ficou pronto: %w", err)
+		return nil, fmt.Errorf("order did not become ready: %w", err)
 	}
 	key, keyPEM, err := newKey(c.KeyType)
 	if err != nil {
@@ -427,7 +437,7 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 		return nil, err
 	}
 	res.keyPEM = keyPEM
-	run.info("Certificado emitido por %s (chave %s, SHA-256 %s)", res.leaf.Issuer.CommonName, c.KeyType, shortFP(res.fingerprint))
+	run.info("acme.log.issued", "Certificate issued by {issuer} (key {key_type}, SHA-256 {fingerprint})", "issuer", res.leaf.Issuer.CommonName, "key_type", c.KeyType, "fingerprint", shortFP(res.fingerprint))
 	return res, nil
 }
 
@@ -435,23 +445,23 @@ func (m *Manager) obtain(ctx context.Context, c *store.Certificate, run *runLog)
 // domain before it is published.
 func verifyIssued(der [][]byte, key crypto.Signer, domains []string) (*issued, error) {
 	if len(der) == 0 {
-		return nil, errors.New("a CA não retornou certificado")
+		return nil, errors.New("the CA returned no certificate")
 	}
 	leaf, err := x509.ParseCertificate(der[0])
 	if err != nil {
-		return nil, fmt.Errorf("certificado inválido: %w", err)
+		return nil, fmt.Errorf("invalid certificate: %w", err)
 	}
 	pub, ok := leaf.PublicKey.(interface{ Equal(crypto.PublicKey) bool })
 	if !ok || !pub.Equal(key.Public()) {
-		return nil, errors.New("o certificado emitido não corresponde à chave gerada")
+		return nil, errors.New("the issued certificate does not match the generated key")
 	}
 	for _, d := range domains {
 		if !slices.Contains(leaf.DNSNames, d) {
-			return nil, fmt.Errorf("o certificado emitido não cobre %s", d)
+			return nil, fmt.Errorf("the issued certificate does not cover %s", d)
 		}
 	}
 	if time.Now().After(leaf.NotAfter) {
-		return nil, errors.New("o certificado emitido já está vencido")
+		return nil, errors.New("the issued certificate is already expired")
 	}
 	var chain strings.Builder
 	for _, b := range der {
@@ -504,11 +514,11 @@ func (m *Manager) publish(ctx context.Context, c *store.Certificate, res *issued
 		return fmt.Errorf("publicar no APISIX: HTTP %d %s", resp.Status, adminError(resp.Body))
 	}
 	after := envelopeValue(resp.Body)
-	run.info("Publicado no APISIX como SSL %s (aplicado sem reload)", c.SSLID)
+	run.info("acme.log.published", "Published to APISIX as SSL {ssl_id} (applied without reload)", "ssl_id", c.SSLID)
 
 	e := store.AuditEvent{
 		Actor: who.Name, IP: who.IP, Action: "acme.issue", Resource: "ssls", ResourceID: c.SSLID, Outcome: audit.Success,
-		Detail: fmt.Sprintf("%s · válido até %s · SHA-256 %s", strings.Join(c.Domains, ", "), res.leaf.NotAfter.Format("02/01/2006"), shortFP(res.fingerprint)),
+		Detail: fmt.Sprintf("%s · valid until %s · SHA-256 %s", strings.Join(c.Domains, ", "), res.leaf.NotAfter.Format(time.DateOnly), shortFP(res.fingerprint)),
 	}
 	if before != nil {
 		e.Before, _ = json.Marshal(apisix.Mask("ssls", before, nil))
@@ -536,14 +546,14 @@ func (m *Manager) Release(ctx context.Context, c *store.Certificate, deleteSSL b
 		if !resp.OK() && resp.Status != http.StatusNotFound {
 			return fmt.Errorf("excluir SSL no APISIX: HTTP %d %s", resp.Status, adminError(resp.Body))
 		}
-		detail += " · SSL excluído do APISIX"
+		detail += " · SSL deleted from APISIX"
 	} else {
 		// Drop the "managed" labels; the certificate keeps being served.
 		resp, err := m.APISIX.Do(ctx, http.MethodPatch, path+"/labels", nil, []byte(`{}`))
 		if err == nil && !resp.OK() && resp.Status != http.StatusNotFound {
 			slog.Warn("acme: could not clear labels", "ssl", c.SSLID, "status", resp.Status, "err", adminError(resp.Body))
 		}
-		detail += " · SSL mantido no APISIX sem renovação"
+		detail += " · SSL kept in APISIX without renewal"
 	}
 	if err := m.Store.DeleteCertificate(ctx, c.ID); err != nil {
 		return err
@@ -641,7 +651,7 @@ func (m *Manager) waitPropagation(ctx context.Context, fqdn, value string, run *
 		}
 	}
 	if len(servers) == 0 {
-		run.warn("Sem servidor DNS para conferir a propagação de %s; aguardando 15s", fqdn)
+		run.warn("acme.log.no_resolver", "No DNS server to check the propagation of {fqdn}; waiting 15s", "fqdn", fqdn)
 		sleep(ctx, 15*time.Second)
 		return
 	}
@@ -655,11 +665,11 @@ func (m *Manager) waitPropagation(ctx context.Context, fqdn, value string, run *
 			}
 		}
 		if missing == "" {
-			run.info("TXT %s visível nos servidores DNS autoritativos", fqdn)
+			run.info("acme.log.txt_visible", "TXT {fqdn} visible on the authoritative DNS servers", "fqdn", fqdn)
 			return
 		}
 		if time.Now().After(deadline) {
-			run.warn("Propagação de %s não confirmada em %s (%s); seguindo com a validação", fqdn, m.PropagationTimeout, missing)
+			run.warn("acme.log.propagation_unconfirmed", "Propagation of {fqdn} not confirmed within {timeout} ({missing}); continuing with validation", "fqdn", fqdn, "timeout", m.PropagationTimeout, "missing", missing)
 			return
 		}
 		if !sleep(ctx, 5*time.Second) {
@@ -737,15 +747,15 @@ func NormalizeDomains(in []string) ([]string, error) {
 			continue
 		}
 		if len(d) > 253 || !domainRe.MatchString(d) {
-			return nil, fmt.Errorf("domínio inválido: %q", d)
+			return nil, i18n.E("acme.invalid_domain", "invalid domain: {domain}", "domain", d)
 		}
 		out = append(out, d)
 	}
 	if len(out) == 0 {
-		return nil, errors.New("informe ao menos um domínio")
+		return nil, i18n.E("acme.domains_required", "enter at least one domain")
 	}
 	if len(out) > 100 {
-		return nil, errors.New("no máximo 100 domínios por certificado")
+		return nil, i18n.E("acme.too_many_domains", "at most {max} domains per certificate", "max", 100)
 	}
 	return out, nil
 }

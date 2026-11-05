@@ -10,15 +10,16 @@ import (
 	"time"
 
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/secure"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
 
 var (
-	ErrInvalidCredentials = errors.New("usuário ou senha inválidos")
-	ErrInvalidCode        = errors.New("código MFA inválido")
-	ErrSessionExpired     = errors.New("sessão expirada")
-	ErrMFAState           = errors.New("operação MFA não permitida neste estado")
+	ErrInvalidCredentials = i18n.E("auth.invalid_credentials", "invalid username or password")
+	ErrInvalidCode        = i18n.E("auth.invalid_mfa_code", "invalid MFA code")
+	ErrSessionExpired     = i18n.E("auth.session_expired", "session expired")
+	ErrMFAState           = i18n.E("auth.mfa_state", "MFA operation not allowed in this state")
 )
 
 type Config struct {
@@ -259,7 +260,7 @@ func (s *Service) ChangePassword(ctx context.Context, sess *store.Session, u *st
 		if err := s.registerFailure(ctx, u, m, "auth.password_change", "invalid current password"); err != nil {
 			return err
 		}
-		return validationErr("senha atual incorreta")
+		return validationErr("auth.current_password_wrong", "current password is incorrect")
 	}
 	if err := s.SetPassword(ctx, u, next, false); err != nil {
 		return err
@@ -281,7 +282,7 @@ func (s *Service) SetPassword(ctx context.Context, u *store.User, pw string, mus
 		}
 		for _, h := range recent {
 			if VerifyPassword(pw, h) {
-				return validationErr("a nova senha não pode ser igual a uma das últimas %d", PasswordHistory)
+				return validationErr("auth.password_reused", "the new password cannot match any of the last {count}", "count", PasswordHistory)
 			}
 		}
 	}
@@ -301,10 +302,10 @@ func (s *Service) SetPassword(ctx context.Context, u *store.User, pw string, mus
 // CreateUser validates and persists a new user.
 func (s *Service) CreateUser(ctx context.Context, username, role, password string, mustChange bool) (*store.User, error) {
 	if !validUsername(username) {
-		return nil, validationErr("nome de usuário inválido: use 3 a 64 caracteres entre letras, números, '.', '_' ou '-'")
+		return nil, validationErr("users.invalid_username", "invalid username: use 3 to 64 letters, digits, '.', '_' or '-'")
 	}
 	if !ValidRole(role) {
-		return nil, validationErr("perfil inválido: %q", role)
+		return nil, validationErr("users.invalid_role", "invalid role")
 	}
 	now := s.now()
 	u := &store.User{Username: username, Role: role, CreatedAt: now}
@@ -313,7 +314,7 @@ func (s *Service) CreateUser(ctx context.Context, username, role, password strin
 	}
 	if err := s.store.CreateUser(ctx, u); err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			return nil, validationErr("o usuário %q já existe", username)
+			return nil, validationErr("users.already_exists", "user {username} already exists", "username", username)
 		}
 		return nil, err
 	}

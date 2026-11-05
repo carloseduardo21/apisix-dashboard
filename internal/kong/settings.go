@@ -3,11 +3,12 @@ package kong
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 // Settings are the migration defaults chosen in the UI. They are applied to
@@ -104,62 +105,62 @@ func oneOf(v string, allowed ...string) bool {
 func (s *Settings) Validate() error {
 	var errs []error
 	if !prefixRe.MatchString(s.IDPrefix) {
-		errs = append(errs, errors.New("prefixo de ID: até 20 caracteres entre letras, números, '.', '_' e '-'"))
+		errs = append(errs, i18n.E("kong.settings.id_prefix", "ID prefix: up to 20 letters, digits, '.', '_' and '-'"))
 	}
 	if !oneOf(s.IDStrategy, "name", "kong_id") {
-		errs = append(errs, errors.New("estratégia de ID inválida"))
+		errs = append(errs, i18n.E("kong.settings.id_strategy", "invalid ID strategy"))
 	}
 	if !oneOf(s.RouteStatus, "disabled", "enabled") {
-		errs = append(errs, errors.New("status das rotas inválido"))
+		errs = append(errs, i18n.E("kong.settings.route_status", "invalid route status"))
 	}
 	if !oneOf(s.OnConflict, "skip", "overwrite") {
-		errs = append(errs, errors.New("política de conflito inválida"))
+		errs = append(errs, i18n.E("kong.settings.on_conflict", "invalid conflict policy"))
 	}
 	if !oneOf(s.UnsupportedPlugins, "block", "skip") {
-		errs = append(errs, errors.New("política para plugins sem tradução inválida"))
+		errs = append(errs, i18n.E("kong.settings.unsupported_plugins", "invalid policy for plugins without translation"))
 	}
 	if !oneOf(s.DisabledPlugins, "skip", "keep") {
-		errs = append(errs, errors.New("política para plugins desabilitados inválida"))
+		errs = append(errs, i18n.E("kong.settings.disabled_plugins", "invalid policy for disabled plugins"))
 	}
 	for i, h := range s.HostRewrites {
 		if !hostRe.MatchString(h.From) {
-			errs = append(errs, fmt.Errorf("reescrita de host %d: origem inválida %q", i+1, h.From))
+			errs = append(errs, i18n.E("kong.settings.rewrite_from", "host rewrite {n}: invalid source '{value}'", "n", i+1, "value", h.From))
 		}
 		if _, _, err := splitHostPort(h.To); err != nil {
-			errs = append(errs, fmt.Errorf("reescrita de host %d: destino inválido %q (use host ou host:porta)", i+1, h.To))
+			errs = append(errs, i18n.E("kong.settings.rewrite_to", "host rewrite {n}: invalid target '{value}' (use host or host:port)", "n", i+1, "value", h.To))
 		}
 	}
 	for k, v := range s.Labels {
 		if k == "" || reservedLabels[k] {
-			errs = append(errs, fmt.Errorf("label %q é reservado ou vazio", k))
+			errs = append(errs, i18n.E("kong.settings.label_reserved", "label '{key}' is reserved or empty", "key", k))
 		}
 		if !labelValueRe.MatchString(v) {
-			errs = append(errs, fmt.Errorf("label %q: o valor não pode ser vazio nem ter espaços", k))
+			errs = append(errs, i18n.E("kong.settings.label_value", "label '{key}': the value cannot be empty or contain spaces", "key", k))
 		}
 	}
 	seen := map[string]bool{}
 	for i, r := range s.PluginRules {
 		n := i + 1
 		if !pluginNameRe.MatchString(r.KongPlugin) {
-			errs = append(errs, fmt.Errorf("regra %d: nome do plugin do Kong inválido", n))
+			errs = append(errs, i18n.E("kong.settings.rule_kong_plugin", "rule {n}: invalid Kong plugin name", "n", n))
 		}
 		if seen[r.KongPlugin] {
-			errs = append(errs, fmt.Errorf("regra %d: já existe uma regra para %q", n, r.KongPlugin))
+			errs = append(errs, i18n.E("kong.settings.rule_duplicate", "rule {n}: a rule for '{plugin}' already exists", "n", n, "plugin", r.KongPlugin))
 		}
 		seen[r.KongPlugin] = true
 		switch r.Action {
 		case RuleIgnore:
 		case RuleMap:
 			if !pluginNameRe.MatchString(r.APISIXPlugin) {
-				errs = append(errs, fmt.Errorf("regra %d: informe o plugin do APISIX", n))
+				errs = append(errs, i18n.E("kong.settings.rule_apisix_plugin", "rule {n}: choose the APISIX plugin", "n", n))
 			}
 			if r.Template == nil {
-				errs = append(errs, fmt.Errorf("regra %d: informe o template (objeto JSON)", n))
+				errs = append(errs, i18n.E("kong.settings.rule_template", "rule {n}: enter the template (JSON object)", "n", n))
 			} else if err := checkTemplate(r.Template); err != nil {
-				errs = append(errs, fmt.Errorf("regra %d: %w", n, err))
+				errs = append(errs, i18n.Wrap(err, "kong.settings.rule_template_invalid", "rule {n}: {detail}", "n", n, "detail", err.Error()))
 			}
 		default:
-			errs = append(errs, fmt.Errorf("regra %d: ação inválida", n))
+			errs = append(errs, i18n.E("kong.settings.rule_action", "rule {n}: invalid action", "n", n))
 		}
 	}
 	return errors.Join(errs...)
@@ -202,10 +203,10 @@ func splitHostPort(v string) (string, int, error) {
 	}
 	port, err := strconv.Atoi(p)
 	if err != nil || port < 1 || port > 65535 {
-		return "", 0, errors.New("porta inválida")
+		return "", 0, errors.New("invalid port")
 	}
 	if !hostRe.MatchString(strings.Trim(h, "[]")) && net.ParseIP(h) == nil {
-		return "", 0, errors.New("host inválido")
+		return "", 0, errors.New("invalid host")
 	}
 	return h, port, nil
 }

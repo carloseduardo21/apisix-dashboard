@@ -18,6 +18,7 @@ import (
 
 	"github.com/carloseduardo21/apisix-dashboard/internal/apisix"
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 	"github.com/carloseduardo21/apisix-dashboard/internal/secure"
 	"github.com/carloseduardo21/apisix-dashboard/internal/store"
 )
@@ -40,8 +41,8 @@ const (
 )
 
 var (
-	ErrBusy  = errors.New("já existe uma migração em andamento")
-	ErrStale = errors.New("o Kong ou o APISIX mudou desde a pré-visualização; gere a pré-visualização de novo")
+	ErrBusy  = i18n.E("kong.busy", "a migration is already running")
+	ErrStale = i18n.E("kong.stale", "Kong or APISIX changed since the preview; generate the preview again")
 )
 
 // Actor identifies who triggered an operation, for the audit trail.
@@ -84,10 +85,12 @@ func (m *Migrator) Settings(ctx context.Context) (Settings, error) {
 	return ParseSettings(b)
 }
 
-// ValidationError carries a message safe to show in the UI.
+// ValidationError carries messages safe to show in the UI (i18n errors,
+// possibly joined).
 type ValidationError struct{ Err error }
 
 func (e *ValidationError) Error() string { return e.Err.Error() }
+func (e *ValidationError) Unwrap() error { return e.Err }
 
 func (m *Migrator) SaveSettings(ctx context.Context, s Settings, a Actor) error {
 	s.Normalize()
@@ -175,7 +178,7 @@ func (m *Migrator) Plan(ctx context.Context, sel *Selection) (*Plan, error) {
 		ours := rec != nil || get(pi.Current, "labels."+LabelKongID) == it.KongID
 		if it.Kind == KindCredential && pi.Current == nil && !it.Blocked {
 			if other := duplicateKey(it, current); other != "" {
-				it.note(LevelError, "a mesma chave key-auth já está na credencial %s do APISIX (credencial recriada no Kong?); remova-a antes", other)
+				it.note(LevelError, i18n.M("kong.note.key_collision", "the same key-auth key is already in APISIX credential {credential} (credential re-created in Kong?); remove it first", "credential", other))
 			}
 		}
 		switch {
@@ -357,10 +360,14 @@ func bodyHash(body map[string]any) string {
 
 // ---- apply ----
 
+// LogEntry is one line of the apply log. Message is English; the UI
+// translates Code/Params.
 type LogEntry struct {
-	TS      time.Time `json:"ts"`
-	Level   string    `json:"level"`
-	Message string    `json:"message"`
+	TS      time.Time         `json:"ts"`
+	Level   string            `json:"level"`
+	Message string            `json:"message"`
+	Code    string            `json:"code,omitempty"`
+	Params  map[string]string `json:"params,omitempty"`
 }
 
 type Result struct {
@@ -375,16 +382,17 @@ type Result struct {
 // Job is one apply run. Only the last one is kept (in memory); the audit
 // trail and the migration records are the durable history.
 type Job struct {
-	ID         string     `json:"id"`
-	Status     string     `json:"status"`
-	Actor      string     `json:"actor"`
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
-	Total      int        `json:"total"`
-	Done       int        `json:"done"`
-	Error      string     `json:"error,omitempty"`
-	Log        []LogEntry `json:"log"`
-	Results    []Result   `json:"results"`
+	ID         string        `json:"id"`
+	Status     string        `json:"status"`
+	Actor      string        `json:"actor"`
+	StartedAt  time.Time     `json:"started_at"`
+	FinishedAt *time.Time    `json:"finished_at,omitempty"`
+	Total      int           `json:"total"`
+	Done       int           `json:"done"`
+	Error      string        `json:"error,omitempty"`
+	ErrorMsg   *i18n.Message `json:"error_message,omitempty"`
+	Log        []LogEntry    `json:"log"`
+	Results    []Result      `json:"results"`
 }
 
 // Job returns a copy of the last apply run, or nil.
@@ -407,9 +415,10 @@ func (m *Migrator) update(fn func(j *Job)) {
 	fn(m.job)
 }
 
-func (m *Migrator) logf(level, format string, args ...any) {
+func (m *Migrator) logf(level, code, template string, kv ...any) {
+	msg := i18n.M(code, template, kv...)
 	m.update(func(j *Job) {
-		j.Log = append(j.Log, LogEntry{TS: time.Now(), Level: level, Message: fmt.Sprintf(format, args...)})
+		j.Log = append(j.Log, LogEntry{TS: time.Now(), Level: level, Message: msg.String(), Code: msg.Code, Params: msg.Params})
 	})
 }
 
@@ -446,7 +455,7 @@ func (m *Migrator) Apply(ctx context.Context, sel Selection, hash string, a Acto
 		}
 	}
 	if total == 0 {
-		return fail(&ValidationError{errors.New("nada a aplicar: os itens selecionados estão bloqueados, em conflito ou sem mudanças")})
+		return fail(&ValidationError{i18n.E("kong.nothing_to_apply", "nothing to apply: the selected items are blocked, in conflict or unchanged")})
 	}
 	m.update(func(j *Job) { j.Total = total })
 	go m.run(plan, a)
@@ -467,7 +476,7 @@ func (m *Migrator) run(plan *Plan, a Actor) {
 		prevRecord[r.Kind+"/"+r.KongID] = r
 	}
 
-	m.logf(LevelInfo, "aplicando %d objetos no APISIX", m.Job().Total)
+	m.logf(LevelInfo, "kong.log.applying", "applying {count} objects to APISIX", "count", m.Job().Total)
 	var done []applied
 	for _, it := range plan.Items {
 		if !it.writes() {
@@ -477,7 +486,7 @@ func (m *Migrator) run(plan *Plan, a Actor) {
 			continue
 		}
 		if err := m.write(ctx, it, a); err != nil {
-			m.logf(LevelError, "%s %s: %v", it.Kind, it.KongName, err)
+			m.logf(LevelError, "kong.log.item_failed", "{kind} {name}: {error}", "kind", it.Kind, "name", it.KongName, "error", err.Error())
 			m.update(func(j *Job) {
 				j.Results = append(j.Results, Result{Kind: it.Kind, KongName: it.KongName, Path: it.Path(), Action: it.Action, Outcome: "failure", Error: err.Error()})
 			})
@@ -485,7 +494,8 @@ func (m *Migrator) run(plan *Plan, a Actor) {
 			m.update(func(j *Job) {
 				now := time.Now()
 				j.Status, j.FinishedAt = JobFailed, &now
-				j.Error = fmt.Sprintf("falha em %s %s: %v; as alterações deste lote foram desfeitas", it.Kind, it.KongName, err)
+				msg := i18n.M("kong.job_failed", "{kind} {name} failed: {error}; the changes of this batch were rolled back", "kind", it.Kind, "name", it.KongName, "error", err.Error())
+				j.Error, j.ErrorMsg = msg.String(), &msg
 			})
 			m.Audit.Record(ctx, store.AuditEvent{Actor: a.Name, IP: a.IP, Action: "kong.migration", Resource: "kong_migration",
 				Outcome: audit.Failure, Detail: m.Job().Error})
@@ -506,7 +516,7 @@ func (m *Migrator) run(plan *Plan, a Actor) {
 		now := time.Now()
 		j.Status, j.FinishedAt = JobSuccess, &now
 	})
-	m.logf(LevelInfo, "migração concluída: %d objetos gravados", len(done))
+	m.logf(LevelInfo, "kong.log.done", "migration finished: {count} objects written", "count", len(done))
 	m.Audit.Record(ctx, store.AuditEvent{Actor: a.Name, IP: a.IP, Action: "kong.migration", Resource: "kong_migration",
 		Outcome: audit.Success, Detail: fmt.Sprintf("%d objetos gravados", len(done))})
 }
@@ -536,7 +546,7 @@ func (m *Migrator) write(ctx context.Context, it *PlanItem, a Actor) error {
 	outcome := audit.Success
 	switch {
 	case err != nil:
-		outcome, err = audit.Failure, fmt.Errorf("admin api inacessível: %w", err)
+		outcome, err = audit.Failure, fmt.Errorf("admin api unreachable: %w", err)
 	case !resp.OK():
 		outcome = audit.Failure
 		msg := http.StatusText(resp.Status)
@@ -574,7 +584,7 @@ func (m *Migrator) rollback(ctx context.Context, done []applied, a Actor) {
 	if len(done) == 0 {
 		return
 	}
-	m.logf(LevelWarn, "desfazendo %d objetos gravados neste lote", len(done))
+	m.logf(LevelWarn, "kong.log.rolling_back", "rolling back {count} objects written in this batch", "count", len(done))
 	for i := len(done) - 1; i >= 0; i-- {
 		d := done[i]
 		it := d.item
@@ -598,10 +608,10 @@ func (m *Migrator) rollback(ctx context.Context, done []applied, a Actor) {
 		}
 		if err != nil {
 			outcome = audit.Failure
-			m.logf(LevelError, "não foi possível desfazer %s: %v (corrija manualmente)", it.Path(), err)
+			m.logf(LevelError, "kong.log.rollback_failed", "could not roll back {path}: {error} (fix it manually)", "path", it.Path(), "error", err.Error())
 		}
 		e := store.AuditEvent{Actor: a.Name, IP: a.IP, Action: "kong.rollback", Resource: it.Resource, ResourceID: it.ID, Outcome: outcome,
-			Detail: "desfazendo migração de kong " + it.Kind + " " + it.KongName}
+			Detail: "rolling back migration of kong " + it.Kind + " " + it.KongName}
 		if d.before != nil {
 			e.After, _ = json.Marshal(m.Mask(it.Resource, d.before))
 		}

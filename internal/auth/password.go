@@ -64,10 +64,10 @@ func VerifyPassword(pw, encoded string) bool {
 // letters and numbers.
 func ValidatePassword(username, pw string) error {
 	if len([]rune(pw)) < MinPasswordLength {
-		return validationErr("a senha deve ter pelo menos %d caracteres", MinPasswordLength)
+		return validationErr("auth.password_too_short", "the password must have at least {min} characters", "min", MinPasswordLength)
 	}
 	if len(pw) > maxPasswordLength {
-		return validationErr("a senha deve ter no máximo %d caracteres", maxPasswordLength)
+		return validationErr("auth.password_too_long", "the password must have at most {max} characters", "max", maxPasswordLength)
 	}
 	var letter, digit bool
 	for _, r := range pw {
@@ -79,10 +79,10 @@ func ValidatePassword(username, pw string) error {
 		}
 	}
 	if !letter || !digit {
-		return validationErr("a senha deve conter letras e números")
+		return validationErr("auth.password_letters_digits", "the password must contain letters and digits")
 	}
 	if username != "" && strings.Contains(strings.ToLower(pw), strings.ToLower(username)) {
-		return validationErr("a senha não pode conter o nome de usuário")
+		return validationErr("auth.password_contains_username", "the password cannot contain the username")
 	}
 	return nil
 }

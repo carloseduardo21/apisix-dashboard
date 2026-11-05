@@ -35,17 +35,17 @@ var version = "dev"
 
 const usage = `apisix-dashboard %s
 
-Uso:
-  apisix-dashboard [serve]                  inicia o servidor
-  apisix-dashboard user add -u NOME -r PERFIL
-  apisix-dashboard user passwd -u NOME      define uma nova senha (temporária)
-  apisix-dashboard user reset-mfa -u NOME
-  apisix-dashboard user unlock -u NOME
+Usage:
+  apisix-dashboard [serve]                  start the server
+  apisix-dashboard user add -u NAME -r ROLE
+  apisix-dashboard user passwd -u NAME      set a new (temporary) password
+  apisix-dashboard user reset-mfa -u NAME
+  apisix-dashboard user unlock -u NAME
   apisix-dashboard user list
-  apisix-dashboard healthcheck              verifica o servidor local (HEALTHCHECK do Docker)
+  apisix-dashboard healthcheck              probe the local server (Docker HEALTHCHECK)
   apisix-dashboard version
 
-Perfis: viewer, operator, admin. Configuração via variáveis DASH_* (veja o README).
+Roles: viewer, operator, admin. Configuration via DASH_* variables (see the README).
 `
 
 func main() {
@@ -72,7 +72,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "erro:", err)
+		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }

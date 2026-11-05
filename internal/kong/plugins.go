@@ -8,6 +8,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 type pluginScope struct {
@@ -26,8 +28,8 @@ type pctx struct {
 	warned bool
 }
 
-func (c *pctx) note(level, format string, args ...any) {
-	c.it.note(level, c.p.Name+": "+format, args...)
+func (c *pctx) note(level string, m i18n.Message) {
+	c.it.pluginNote(level, c.p.Name, m, nil)
 	if level != LevelInfo {
 		c.warned = true
 	}
@@ -70,7 +72,15 @@ func BuiltinPlugins() []string {
 	return slices.Sorted(maps.Keys(builtins))
 }
 
-var errUnsupported = errors.New("sem tradução automática")
+var errUnsupported = i18n.E("kong.reason.no_translation", "no automatic translation")
+
+// reasonOf is the user-facing reason a plugin could not be translated.
+func reasonOf(err error) i18n.Message {
+	if msgs, ok := i18n.Messages(err); ok {
+		return msgs[0]
+	}
+	return i18n.M("kong.reason.other", "{detail}", "detail", err.Error())
+}
 
 // plugins translates the Kong plugins matched by match into an APISIX
 // plugins object, recording on it how each one was handled.
@@ -87,24 +97,25 @@ func (t *translator) plugins(it *Item, scope pluginScope, match func(*Plugin) bo
 	for _, p := range list {
 		c := &pctx{t: t, it: it, p: p, scope: scope}
 		pm := PluginMap{Kong: p.Name, Status: "ok"}
-		unsupported := func(reason string) {
+		unsupported := func(err error) {
+			reason := reasonOf(err)
 			if t.set.UnsupportedPlugins == "block" {
-				it.note(LevelError, "%s: %s (o objeto fica bloqueado para não migrar sem o plugin)", p.Name, reason)
+				it.pluginNote(LevelError, p.Name, i18n.M("kong.note.plugin_blocks", "the object is blocked so it does not migrate without the plugin"), &reason)
 				pm.Status = "error"
 			} else {
-				it.note(LevelWarn, "%s: %s; migrado sem o plugin", p.Name, reason)
+				it.pluginNote(LevelWarn, p.Name, i18n.M("kong.note.plugin_skipped", "migrated without the plugin"), &reason)
 				pm.Status = "warn"
 			}
 		}
 		if !p.Enabled && t.set.DisabledPlugins == "skip" {
-			it.note(LevelInfo, "%s: desabilitado no Kong; não migrado", p.Name)
+			it.pluginNote(LevelInfo, p.Name, i18n.M("kong.note.plugin_disabled", "disabled in Kong; not migrated"), nil)
 			pm.Status = "disabled"
 			it.Plugins = append(it.Plugins, pm)
 			continue
 		}
 		rule := t.rules[p.Name]
 		if rule != nil && rule.Action == RuleIgnore {
-			it.note(LevelInfo, "%s: ignorado pela regra da migração", p.Name)
+			it.pluginNote(LevelInfo, p.Name, i18n.M("kong.note.plugin_ignored", "ignored by the migration rule"), nil)
 			pm.Status, pm.Custom = "ignored", true
 			it.Plugins = append(it.Plugins, pm)
 			continue
@@ -113,9 +124,9 @@ func (t *translator) plugins(it *Item, scope pluginScope, match func(*Plugin) bo
 		var err error
 		switch {
 		case p.ConsumerGroup != nil:
-			err = errors.New("plugins por consumer group não são suportados")
+			err = i18n.E("kong.reason.consumer_group", "consumer group plugins are not supported")
 		case p.Consumer != nil && scope.level != "consumer":
-			err = errors.New("plugin restrito a um consumer numa rota/service não tem equivalente no APISIX")
+			err = i18n.E("kong.reason.consumer_scoped", "a plugin scoped to a consumer on a route/service has no equivalent in APISIX")
 		case rule != nil:
 			pm.Custom = true
 			res, err = c.custom(rule)
@@ -125,7 +136,7 @@ func (t *translator) plugins(it *Item, scope pluginScope, match func(*Plugin) bo
 			err = errUnsupported
 		}
 		if err != nil {
-			unsupported(err.Error())
+			unsupported(err)
 			it.Plugins = append(it.Plugins, pm)
 			continue
 		}
@@ -142,7 +153,7 @@ func (t *translator) plugins(it *Item, scope pluginScope, match func(*Plugin) bo
 					mergeRewrite(prev, conf)
 					continue
 				}
-				c.note(LevelWarn, "outro plugin do Kong também gera %s; esta configuração prevalece", name)
+				c.note(LevelWarn, i18n.M("kong.note.plugin_overrides", "another Kong plugin also produces {plugin}; this configuration wins", "plugin", name))
 			}
 			out[name] = conf
 			pm.APISIX = append(pm.APISIX, name)
@@ -240,10 +251,10 @@ func (c *pctx) anonymous(conf map[string]any, dst map[string]any) {
 	}
 	if u := c.t.snap.consumer(ref); u != nil && c.t.usernames[u.ID] != "" {
 		dst["anonymous_consumer"] = c.t.usernames[u.ID]
-		c.note(LevelInfo, "consumer anônimo %q: migre-o também", c.t.usernames[u.ID])
+		c.note(LevelInfo, i18n.M("kong.note.anonymous_migrate", "anonymous consumer '{consumer}': migrate it too", "consumer", c.t.usernames[u.ID]))
 		return
 	}
-	c.note(LevelWarn, "consumer anônimo %q não encontrado no Kong", ref)
+	c.note(LevelWarn, i18n.M("kong.note.anonymous_missing", "anonymous consumer '{consumer}' not found in Kong", "consumer", ref))
 }
 
 // ---- authentication ----
@@ -255,20 +266,20 @@ func keyAuth(c *pctx, conf map[string]any) (map[string]any, error) {
 		name = names[0]
 	}
 	if len(names) > 1 {
-		c.note(LevelWarn, "o APISIX aceita um único nome de chave; usando %q (de %s)", name, strings.Join(names, ", "))
+		c.note(LevelWarn, i18n.M("kong.note.key_name_single", "APISIX accepts a single key name; using '{name}' (of {names})", "name", name, "names", strings.Join(names, ", ")))
 	}
 	out := map[string]any{"header": name, "query": name}
 	if v, ok := boolean(conf, "hide_credentials"); ok {
 		out["hide_credentials"] = v
 	}
 	if v, _ := boolean(conf, "key_in_body"); v {
-		c.note(LevelWarn, "chave no corpo (key_in_body) não é suportada")
+		c.note(LevelWarn, i18n.M("kong.note.key_in_body", "key in body (key_in_body) is not supported"))
 	}
 	if v, ok := boolean(conf, "key_in_query"); ok && !v {
-		c.note(LevelInfo, "o APISIX também aceita a chave na query string")
+		c.note(LevelInfo, i18n.M("kong.note.key_also_query", "APISIX also accepts the key in the query string"))
 	}
 	if v, ok := boolean(conf, "key_in_header"); ok && !v {
-		c.note(LevelInfo, "o APISIX também aceita a chave no header")
+		c.note(LevelInfo, i18n.M("kong.note.key_also_header", "APISIX also accepts the key in the header"))
 	}
 	c.anonymous(conf, out)
 	return one("key-auth", out), nil
@@ -280,7 +291,7 @@ func basicAuth(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["hide_credentials"] = v
 	}
 	c.anonymous(conf, out)
-	c.note(LevelWarn, "as senhas não migram do Kong (hash); recadastre as credenciais basic-auth")
+	c.note(LevelWarn, i18n.M("kong.note.basic_auth_reset", "passwords do not migrate from Kong (hashed); re-create the basic-auth credentials"))
 	return one("basic-auth", out), nil
 }
 
@@ -293,7 +304,7 @@ func jwtAuth(c *pctx, conf map[string]any) (map[string]any, error) {
 		if l := strs(conf, k); len(l) > 0 {
 			out[apisixKey] = l[0]
 			if len(l) > 1 {
-				c.note(LevelWarn, "%s: o APISIX aceita um único valor; usando %q", k, l[0])
+				c.note(LevelWarn, i18n.M("kong.note.single_value", "{field}: APISIX accepts a single value; using '{value}'", "field", k, "value", l[0]))
 			}
 		}
 	}
@@ -310,10 +321,10 @@ func jwtAuth(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["claims_to_verify"] = claims
 	}
 	if v, _ := boolean(conf, "secret_is_base64"); v {
-		c.note(LevelWarn, "secret_is_base64: no APISIX é por credencial (base64_secret); ajuste as credenciais jwt-auth")
+		c.note(LevelWarn, i18n.M("kong.note.secret_base64", "secret_is_base64: in APISIX it is per credential (base64_secret); adjust the jwt-auth credentials"))
 	}
 	if n, _ := num(conf, "maximum_expiration"); n > 0 {
-		c.note(LevelWarn, "maximum_expiration (%vs) não tem equivalente", n)
+		c.note(LevelWarn, i18n.M("kong.note.max_expiration", "maximum_expiration ({seconds}s) has no equivalent", "seconds", n))
 	}
 	c.anonymous(conf, out)
 	return one("jwt-auth", out), nil
@@ -335,7 +346,7 @@ func hmacAuth(c *pctx, conf map[string]any) (map[string]any, error) {
 			out[k] = v
 		}
 	}
-	c.note(LevelWarn, "o header de assinatura muda (Kong: hmac username=...; APISIX: Signature keyId=...); os clientes precisam se adaptar")
+	c.note(LevelWarn, i18n.M("kong.note.hmac_header", "the signature header changes (Kong: hmac username=...; APISIX: Signature keyId=...); clients must adapt"))
 	c.anonymous(conf, out)
 	return one("hmac-auth", out), nil
 }
@@ -351,10 +362,10 @@ func acl(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["deny_labels"] = map[string]any{LabelGroups: toAny(groupLabels(d))}
 	}
 	if len(out) == 0 {
-		return nil, errors.New("acl sem allow nem deny")
+		return nil, i18n.E("kong.reason.acl_empty", "acl without allow or deny")
 	}
 	if v, _ := boolean(conf, "hide_groups_header"); !v {
-		c.note(LevelInfo, "o APISIX não envia o header X-Consumer-Groups ao upstream")
+		c.note(LevelInfo, i18n.M("kong.note.consumer_groups_header", "APISIX does not send the X-Consumer-Groups header upstream"))
 	}
 	return one("acl", out), nil
 }
@@ -380,7 +391,7 @@ func rateLimiting(c *pctx, conf map[string]any) (map[string]any, error) {
 	case "", "consumer", "credential":
 		key, keyType = "consumer_name", "var"
 		if by == "credential" {
-			c.note(LevelInfo, "limit_by=credential vira limite por consumer")
+			c.note(LevelInfo, i18n.M("kong.note.limit_by_credential", "limit_by=credential becomes a per-consumer limit"))
 		}
 	case "ip":
 		key, keyType = "remote_addr", "var"
@@ -389,15 +400,15 @@ func rateLimiting(c *pctx, conf map[string]any) (map[string]any, error) {
 	case "path":
 		key, keyType = "uri", "var"
 		if p := str(conf, "path"); p != "" {
-			c.note(LevelWarn, "limit_by=path com path fixo %q: o APISIX limita por URI de cada requisição", p)
+			c.note(LevelWarn, i18n.M("kong.note.limit_by_path", "limit_by=path with fixed path '{path}': APISIX limits by each request URI", "path", p))
 		}
 	case "service":
 		key, keyType = "service", "constant"
 	default:
-		return nil, fmt.Errorf("limit_by=%s não suportado", by)
+		return nil, i18n.E("kong.reason.limit_by", "limit_by={value} is not supported", "value", by)
 	}
 	if key == "consumer_name" && c.scope.level != "consumer" {
-		c.note(LevelInfo, "sem consumer autenticado o limite passa a ser por IP")
+		c.note(LevelInfo, i18n.M("kong.note.limit_fallback_ip", "without an authenticated consumer the limit falls back to the client IP"))
 	}
 
 	out := map[string]any{}
@@ -423,16 +434,16 @@ func rateLimiting(c *pctx, conf map[string]any) (map[string]any, error) {
 	default:
 		// One counter per window, keyed by the same variable.
 		out["rules"] = rules
-		c.note(LevelInfo, "%d janelas de limite viram regras do limit-count (headers com prefixo por janela)", len(rules))
+		c.note(LevelInfo, i18n.M("kong.note.limit_windows", "{count} limit windows become limit-count rules (headers prefixed per window)", "count", len(rules)))
 	}
 
 	switch policy := str(conf, "policy"); policy {
 	case "", "local":
 		out["policy"] = "local"
-		c.note(LevelInfo, "policy local: o limite é contado por instância do APISIX")
+		c.note(LevelInfo, i18n.M("kong.note.policy_local", "local policy: the limit is counted per APISIX instance"))
 	case "cluster":
 		out["policy"] = "local"
-		c.note(LevelWarn, "policy cluster (banco do Kong) não existe no APISIX; usando local (por instância). Considere redis")
+		c.note(LevelWarn, i18n.M("kong.note.policy_cluster", "cluster policy (Kong database) does not exist in APISIX; using local (per instance). Consider redis"))
 	case "redis":
 		redis := obj(conf, "redis")
 		get := func(nested, flat string) any {
@@ -458,10 +469,10 @@ func rateLimiting(c *pctx, conf map[string]any) (map[string]any, error) {
 			out[apisixKey] = v
 		}
 		if out["redis_host"] == nil {
-			return nil, errors.New("policy redis sem host")
+			return nil, i18n.E("kong.reason.redis_no_host", "redis policy without a host")
 		}
 	default:
-		return nil, fmt.Errorf("policy %s não suportada", policy)
+		return nil, i18n.E("kong.reason.policy", "policy {value} is not supported", "value", policy)
 	}
 	if v, ok := boolean(conf, "fault_tolerant"); ok {
 		out["allow_degradation"] = v
@@ -503,7 +514,7 @@ func cors(c *pctx, conf map[string]any) (map[string]any, error) {
 	case wildcard && credentials:
 		// APISIX forbids "*" with credentials; "**" reflects the origin, as Kong does.
 		out["allow_origins"] = "**"
-		c.note(LevelWarn, "origem * com credentials: o APISIX usa \"**\", que aceita qualquer origem com credenciais")
+		c.note(LevelWarn, i18n.M("kong.note.cors_wildcard_credentials", "origin * with credentials: APISIX uses \"**\", which accepts any origin with credentials"))
 	case wildcard:
 		out["allow_origins"] = "*"
 	default:
@@ -537,7 +548,7 @@ func cors(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["max_age"] = int(n)
 	}
 	if v, _ := boolean(conf, "preflight_continue"); v {
-		c.note(LevelWarn, "preflight_continue não tem equivalente (o APISIX responde o preflight)")
+		c.note(LevelWarn, i18n.M("kong.note.preflight_continue", "preflight_continue has no equivalent (APISIX answers the preflight)"))
 	}
 	return one("cors", out), nil
 }
@@ -549,12 +560,12 @@ func ipRestriction(c *pctx, conf map[string]any) (map[string]any, error) {
 	case len(allow) > 0:
 		out["whitelist"] = toAny(allow)
 		if len(deny) > 0 {
-			c.note(LevelWarn, "o APISIX não combina allow e deny; usando só allow (%d faixas de deny descartadas)", len(deny))
+			c.note(LevelWarn, i18n.M("kong.note.ip_allow_deny", "APISIX does not combine allow and deny; using allow only ({count} deny ranges dropped)", "count", len(deny)))
 		}
 	case len(deny) > 0:
 		out["blacklist"] = toAny(deny)
 	default:
-		return nil, errors.New("sem allow nem deny")
+		return nil, i18n.E("kong.reason.no_allow_deny", "no allow or deny list")
 	}
 	if n, ok := num(conf, "status"); ok {
 		out["response_code"] = int(n)
@@ -575,7 +586,7 @@ func headerPairs(c *pctx, list []string) map[string]any {
 		}
 		v = strings.TrimSpace(v)
 		if strings.Contains(v, "$(") {
-			c.note(LevelWarn, "template Lua em %q não é suportado; o valor é copiado como texto", k)
+			c.note(LevelWarn, i18n.M("kong.note.lua_template", "Lua template in '{field}' is not supported; the value is copied as text", "field", k))
 		}
 		out[strings.TrimSpace(k)] = v
 	}
@@ -590,7 +601,7 @@ func requestTransformer(c *pctx, conf map[string]any) (map[string]any, error) {
 		maps.Copy(set, headerPairs(c, strs(obj(conf, part), "headers")))
 	}
 	if len(strs(obj(conf, "add"), "headers")) > 0 {
-		c.note(LevelInfo, "add.headers vira set: o header é sobrescrito mesmo se já existir")
+		c.note(LevelInfo, i18n.M("kong.note.add_headers_set", "add.headers becomes set: the header is overwritten even if it exists"))
 	}
 	for _, pair := range strs(obj(conf, "rename"), "headers") {
 		from, to, ok := strings.Cut(pair, ":")
@@ -622,11 +633,11 @@ func requestTransformer(c *pctx, conf map[string]any) (map[string]any, error) {
 	for _, part := range []string{"add", "append", "replace", "remove", "rename"} {
 		p := obj(conf, part)
 		if len(strs(p, "querystring")) > 0 || len(strs(p, "body")) > 0 {
-			c.note(LevelWarn, "%s de querystring/body não é suportado pelo proxy-rewrite", part)
+			c.note(LevelWarn, i18n.M("kong.note.rewrite_unsupported_part", "{part} of querystring/body is not supported by proxy-rewrite", "part", part))
 		}
 	}
 	if len(out) == 0 {
-		c.note(LevelInfo, "nenhuma transformação suportada configurada")
+		c.note(LevelInfo, i18n.M("kong.note.no_supported_transform", "no supported transformation configured"))
 		return map[string]any{}, nil
 	}
 	return one("proxy-rewrite", out), nil
@@ -658,11 +669,11 @@ func responseTransformer(c *pctx, conf map[string]any) (map[string]any, error) {
 	}
 	for _, part := range []string{"add", "append", "replace", "remove", "rename"} {
 		if len(strs(obj(conf, part), "json")) > 0 {
-			c.note(LevelWarn, "%s.json (corpo da resposta) não é suportado", part)
+			c.note(LevelWarn, i18n.M("kong.note.response_json", "{part}.json (response body) is not supported", "part", part))
 		}
 	}
 	if len(headers) == 0 {
-		c.note(LevelInfo, "nenhuma transformação suportada configurada")
+		c.note(LevelInfo, i18n.M("kong.note.no_supported_transform", "no supported transformation configured"))
 		return map[string]any{}, nil
 	}
 	return one("response-rewrite", map[string]any{"headers": headers}), nil
@@ -677,27 +688,27 @@ func correlationID(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["include_in_response"] = v
 	}
 	if g := str(conf, "generator"); g != "" && g != "uuid" {
-		c.note(LevelInfo, "gerador %s vira uuid", g)
+		c.note(LevelInfo, i18n.M("kong.note.generator_uuid", "generator {generator} becomes uuid", "generator", g))
 	}
 	return one("request-id", out), nil
 }
 
 func prometheus(c *pctx, conf map[string]any) (map[string]any, error) {
-	c.note(LevelInfo, "as métricas do APISIX têm outros nomes (apisix_*); ajuste dashboards e alertas")
+	c.note(LevelInfo, i18n.M("kong.note.metrics_names", "APISIX metrics have different names (apisix_*); adjust dashboards and alerts"))
 	return one("prometheus", map[string]any{"prefer_name": true}), nil
 }
 
 func logNote(c *pctx, conf map[string]any) {
-	c.note(LevelInfo, "o formato do log do APISIX é diferente do Kong; ajuste o parser no destino")
+	c.note(LevelInfo, i18n.M("kong.note.log_format", "the APISIX log format differs from Kong; adjust the parser at the destination"))
 	if len(obj(conf, "custom_fields_by_lua")) > 0 {
-		c.note(LevelWarn, "custom_fields_by_lua não é suportado (use log_format)")
+		c.note(LevelWarn, i18n.M("kong.note.custom_fields_lua", "custom_fields_by_lua is not supported (use log_format)"))
 	}
 }
 
 func fileLog(c *pctx, conf map[string]any) (map[string]any, error) {
 	p := str(conf, "path")
 	if p == "" {
-		return nil, errors.New("sem path")
+		return nil, i18n.E("kong.reason.no_path", "no path")
 	}
 	logNote(c, conf)
 	return one("file-logger", map[string]any{"path": p}), nil
@@ -706,7 +717,7 @@ func fileLog(c *pctx, conf map[string]any) (map[string]any, error) {
 func httpLog(c *pctx, conf map[string]any) (map[string]any, error) {
 	u := str(conf, "http_endpoint")
 	if u == "" {
-		return nil, errors.New("sem http_endpoint")
+		return nil, i18n.E("kong.reason.no_http_endpoint", "no http_endpoint")
 	}
 	out := map[string]any{"uri": u}
 	if n, ok := num(conf, "timeout"); ok && n > 0 {
@@ -726,7 +737,7 @@ func httpLog(c *pctx, conf map[string]any) (map[string]any, error) {
 		if strings.EqualFold(k, "authorization") {
 			out["auth_header"] = fmt.Sprint(v)
 		} else {
-			c.note(LevelWarn, "header %q não é suportado pelo http-logger (só Authorization)", k)
+			c.note(LevelWarn, i18n.M("kong.note.http_logger_header", "header '{header}' is not supported by http-logger (Authorization only)", "header", k))
 		}
 	}
 	logNote(c, conf)
@@ -742,7 +753,7 @@ func tcpLog(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["tls"] = v
 	}
 	if s := str(conf, "tls_sni"); s != "" {
-		c.note(LevelWarn, "tls_sni %q não tem equivalente no tcp-logger", s)
+		c.note(LevelWarn, i18n.M("kong.note.tcp_logger_sni", "tls_sni '{sni}' has no equivalent in tcp-logger", "sni", s))
 	}
 	if n, ok := num(conf, "timeout"); ok && n > 0 {
 		out["timeout"] = int(n)
@@ -765,7 +776,7 @@ func udpLog(c *pctx, conf map[string]any) (map[string]any, error) {
 
 func proxyCache(c *pctx, conf map[string]any) (map[string]any, error) {
 	if s := str(conf, "strategy"); s != "" && s != "memory" {
-		return nil, fmt.Errorf("strategy %s não suportada", s)
+		return nil, i18n.E("kong.reason.strategy", "strategy {value} is not supported", "value", s)
 	}
 	out := map[string]any{"cache_strategy": "memory", "cache_zone": "memory_cache"}
 	if n, ok := num(conf, "cache_ttl"); ok {
@@ -781,12 +792,12 @@ func proxyCache(c *pctx, conf map[string]any) (map[string]any, error) {
 		out["cache_control"] = v
 	}
 	if len(anySlice(conf["vary_headers"])) > 0 || len(anySlice(conf["vary_query_params"])) > 0 {
-		c.note(LevelWarn, "vary_headers/vary_query_params: ajuste cache_key manualmente")
+		c.note(LevelWarn, i18n.M("kong.note.cache_vary", "vary_headers/vary_query_params: adjust cache_key manually"))
 	}
 	if len(anySlice(conf["content_type"])) > 0 {
-		c.note(LevelInfo, "o filtro por content_type não existe no APISIX")
+		c.note(LevelInfo, i18n.M("kong.note.cache_content_type", "the content_type filter does not exist in APISIX"))
 	}
-	c.note(LevelInfo, "requer a zona memory_cache em apisix.proxy_cache no config.yaml")
+	c.note(LevelInfo, i18n.M("kong.note.cache_zone", "requires the memory_cache zone in apisix.proxy_cache in config.yaml"))
 	return one("proxy-cache", out), nil
 }
 
@@ -797,25 +808,25 @@ func requestSizeLimiting(c *pctx, conf map[string]any) (map[string]any, error) {
 		mult = 1 << 20
 	}
 	if v, _ := boolean(conf, "require_content_length"); v {
-		c.note(LevelWarn, "require_content_length não tem equivalente")
+		c.note(LevelWarn, i18n.M("kong.note.require_content_length", "require_content_length has no equivalent"))
 	}
 	return one("client-control", map[string]any{"max_body_size": int(size * mult)}), nil
 }
 
 func botDetection(c *pctx, conf map[string]any) (map[string]any, error) {
 	allow, deny := strs(conf, "allow"), strs(conf, "deny")
-	c.note(LevelWarn, "o Kong bloqueia uma lista embutida de bots; o APISIX só usa as listas configuradas")
+	c.note(LevelWarn, i18n.M("kong.note.bot_builtin_list", "Kong blocks a built-in bot list; APISIX only uses the configured lists"))
 	switch {
 	case len(deny) > 0:
 		if len(allow) > 0 {
-			c.note(LevelWarn, "o APISIX não combina allowlist e denylist; usando só deny")
+			c.note(LevelWarn, i18n.M("kong.note.bot_allow_deny", "APISIX does not combine allowlist and denylist; using deny only"))
 		}
 		return one("ua-restriction", map[string]any{"denylist": toAny(deny)}), nil
 	case len(allow) > 0:
-		c.note(LevelWarn, "só allow no Kong libera exceções à lista embutida; no APISIX vira allowlist (bloqueia todo o resto)")
+		c.note(LevelWarn, i18n.M("kong.note.bot_allow_only", "allow-only in Kong whitelists exceptions to the built-in list; in APISIX it becomes an allowlist (blocks everything else)"))
 		return one("ua-restriction", map[string]any{"allowlist": toAny(allow)}), nil
 	}
-	return nil, errors.New("sem listas allow/deny: a lista embutida do Kong não existe no APISIX")
+	return nil, i18n.E("kong.reason.bot_no_lists", "no allow/deny lists: Kong's built-in list does not exist in APISIX")
 }
 
 func requestTermination(c *pctx, conf map[string]any) (map[string]any, error) {
@@ -832,10 +843,10 @@ func requestTermination(c *pctx, conf map[string]any) (map[string]any, error) {
 		abort["headers"] = map[string]any{"Content-Type": "application/json; charset=utf-8"}
 	}
 	if v, _ := boolean(conf, "echo"); v {
-		c.note(LevelWarn, "echo não é suportado")
+		c.note(LevelWarn, i18n.M("kong.note.echo_unsupported", "echo is not supported"))
 	}
 	if t := str(conf, "trigger"); t != "" {
-		c.note(LevelWarn, "trigger %q não é suportado: a rota sempre responde", t)
+		c.note(LevelWarn, i18n.M("kong.note.trigger_unsupported", "trigger '{trigger}' is not supported: the route always answers", "trigger", t))
 	}
 	return one("fault-injection", map[string]any{"abort": abort}), nil
 }
@@ -844,7 +855,7 @@ func openIDConnect(c *pctx, conf map[string]any) (map[string]any, error) {
 	issuer := str(conf, "issuer")
 	ids := strs(conf, "client_id")
 	if issuer == "" || len(ids) == 0 {
-		return nil, errors.New("sem issuer ou client_id")
+		return nil, i18n.E("kong.reason.oidc_incomplete", "missing issuer or client_id")
 	}
 	discovery := issuer
 	if !strings.Contains(discovery, "/.well-known/") {
@@ -864,6 +875,6 @@ func openIDConnect(c *pctx, conf map[string]any) (map[string]any, error) {
 	if r := strs(conf, "redirect_uri"); len(r) > 0 {
 		out["redirect_uri"] = r[0]
 	}
-	c.note(LevelWarn, "o openid-connect do Kong Enterprise tem muitas opções; revise a configuração gerada")
+	c.note(LevelWarn, i18n.M("kong.note.oidc_review", "Kong Enterprise openid-connect has many options; review the generated configuration"))
 	return one("openid-connect", out), nil
 }

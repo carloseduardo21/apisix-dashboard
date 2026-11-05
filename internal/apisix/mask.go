@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/carloseduardo21/apisix-dashboard/internal/i18n"
 )
 
 // Masked replaces secret values in everything sent to the browser and in the
@@ -166,7 +168,7 @@ func unmask(next, prev any, path string) (any, error) {
 		if s, ok := prev.(string); ok {
 			return s, nil
 		}
-		return nil, fmt.Errorf("o campo %q contém um valor mascarado sem valor original; informe o valor real", strings.TrimPrefix(path, "."))
+		return nil, i18n.E("apisix.masked_without_original", "field {field} contains a masked value with no original value; enter the real value", "field", strings.TrimPrefix(path, "."))
 	case map[string]any:
 		pm, _ := prev.(map[string]any)
 		for k, val := range t {

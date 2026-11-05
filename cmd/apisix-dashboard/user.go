@@ -20,12 +20,12 @@ import (
 
 func userCmd(args []string) error {
 	if len(args) == 0 {
-		return errors.New("subcomando ausente: add, passwd, reset-mfa, unlock ou list")
+		return errors.New("missing subcommand: add, passwd, reset-mfa, unlock or list")
 	}
 	sub, args := args[0], args[1:]
 	fs := flag.NewFlagSet("user "+sub, flag.ContinueOnError)
-	username := fs.String("u", "", "nome do usuário")
-	role := fs.String("r", auth.RoleViewer, "perfil: viewer, operator ou admin")
+	username := fs.String("u", "", "username")
+	role := fs.String("r", auth.RoleViewer, "role: viewer, operator or admin")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -44,18 +44,18 @@ func userCmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%-24s %-9s %-4s %-9s %s\n", "USUÁRIO", "PERFIL", "MFA", "STATUS", "ÚLTIMO LOGIN")
+		fmt.Printf("%-24s %-9s %-4s %-9s %s\n", "USERNAME", "ROLE", "MFA", "STATUS", "LAST LOGIN")
 		for _, u := range users {
-			status := "ativo"
+			status := "active"
 			switch {
 			case u.Disabled:
-				status = "inativo"
+				status = "disabled"
 			case time.Now().Before(u.LockedUntil):
-				status = "bloqueado"
+				status = "locked"
 			}
-			mfa := "não"
+			mfa := "no"
 			if u.TOTPSecret != nil {
-				mfa = "sim"
+				mfa = "yes"
 			}
 			last := "-"
 			if !u.LastLoginAt.IsZero() {
@@ -67,7 +67,7 @@ func userCmd(args []string) error {
 	}
 
 	if *username == "" {
-		return errors.New("informe o usuário com -u")
+		return errors.New("set the username with -u")
 	}
 	record := func(action, detail string) {
 		st.audit.Record(ctx, store.AuditEvent{
@@ -86,13 +86,13 @@ func userCmd(args []string) error {
 			return err
 		}
 		record("user.create", "role="+*role)
-		fmt.Printf("usuário %q criado (%s). O MFA será configurado no primeiro login.\n", *username, *role)
+		fmt.Printf("user %q created (%s). MFA will be set up at the first login.\n", *username, *role)
 		return nil
 	}
 
 	u, err := st.store.GetUserByUsername(ctx, *username)
 	if errors.Is(err, store.ErrNotFound) {
-		return fmt.Errorf("usuário %q não encontrado", *username)
+		return fmt.Errorf("user %q not found", *username)
 	}
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func userCmd(args []string) error {
 			return err
 		}
 		record("user.password_reset", "")
-		fmt.Println("senha definida; o usuário deverá trocá-la no próximo login.")
+		fmt.Println("password set; the user must change it at the next login.")
 	case "reset-mfa":
 		u.TOTPSecret = nil
 		u.TOTPLastStep = 0
@@ -116,7 +116,7 @@ func userCmd(args []string) error {
 			return err
 		}
 		record("user.mfa_reset", "")
-		fmt.Println("MFA removido; será configurado novamente no próximo login.")
+		fmt.Println("MFA removed; it will be set up again at the next login.")
 	case "unlock":
 		u.FailedAttempts = 0
 		u.LockedUntil = time.Time{}
@@ -125,9 +125,9 @@ func userCmd(args []string) error {
 			return err
 		}
 		record("user.unlock", "")
-		fmt.Println("usuário desbloqueado.")
+		fmt.Println("user unlocked.")
 	default:
-		return fmt.Errorf("subcomando desconhecido: %s", sub)
+		return fmt.Errorf("unknown subcommand: %s", sub)
 	}
 	// Any credential change ends existing sessions.
 	return st.store.DeleteUserSessions(ctx, u.ID, "")
@@ -148,24 +148,24 @@ func readPassword() (string, error) {
 	if !term.IsTerminal(fd) {
 		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil && line == "" {
-			return "", errors.New("senha não informada no stdin")
+			return "", errors.New("no password given on stdin")
 		}
 		return strings.TrimRight(line, "\r\n"), nil
 	}
-	fmt.Fprintf(os.Stderr, "Senha (mín. %d caracteres, letras e números): ", auth.MinPasswordLength)
+	fmt.Fprintf(os.Stderr, "Password (min. %d characters, letters and digits): ", auth.MinPasswordLength)
 	a, err := term.ReadPassword(fd)
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprint(os.Stderr, "Confirme a senha: ")
+	fmt.Fprint(os.Stderr, "Confirm the password: ")
 	b, err := term.ReadPassword(fd)
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err
 	}
 	if string(a) != string(b) {
-		return "", errors.New("as senhas não conferem")
+		return "", errors.New("the passwords do not match")
 	}
 	return string(a), nil
 }
