@@ -140,6 +140,6 @@ func resolve(expr string, ctx map[string]any) any {
 func toMap(v any) map[string]any {
 	b, _ := json.Marshal(v)
 	var m map[string]any
-	json.Unmarshal(b, &m)
+	_ = json.Unmarshal(b, &m) // round-trip of a value we just marshaled
 	return m
 }

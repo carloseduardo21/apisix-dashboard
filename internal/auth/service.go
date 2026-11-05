@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/carloseduardo21/apisix-dashboard/internal/audit"
@@ -134,6 +135,14 @@ func (s *Service) registerFailure(ctx context.Context, u *store.User, m Meta, ac
 	return nil
 }
 
+// dropSession deletes an invalid session. A failure is only logged: the
+// session is rejected anyway and the janitor purges it later.
+func (s *Service) dropSession(ctx context.Context, idHash string) {
+	if err := s.store.DeleteSession(ctx, idHash); err != nil {
+		slog.Error("auth: delete invalid session", "err", err)
+	}
+}
+
 // Authenticate resolves a session token, enforcing idle and absolute timeouts.
 func (s *Service) Authenticate(ctx context.Context, token string) (*store.Session, *store.User, error) {
 	sess, err := s.store.GetSession(ctx, secure.HashToken(token))
@@ -149,12 +158,12 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*store.Sessio
 		idle = s.cfg.PendingTimeout
 	}
 	if now.Sub(sess.LastSeen) > idle || now.Sub(sess.CreatedAt) > s.cfg.SessionMaxLifetime {
-		s.store.DeleteSession(ctx, sess.IDHash)
+		s.dropSession(ctx, sess.IDHash)
 		return nil, nil, ErrSessionExpired
 	}
 	u, err := s.store.GetUserByID(ctx, sess.UserID)
 	if errors.Is(err, store.ErrNotFound) || (err == nil && (u.Disabled || now.Before(u.LockedUntil))) {
-		s.store.DeleteSession(ctx, sess.IDHash)
+		s.dropSession(ctx, sess.IDHash)
 		return nil, nil, ErrSessionExpired
 	}
 	if err != nil {

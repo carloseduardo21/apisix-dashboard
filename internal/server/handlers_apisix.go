@@ -89,9 +89,13 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request, p *princi
 		badGateway(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(resp.Status)
-	_, _ = w.Write(resp.Body) // client may have gone away; nothing to do
+	// Re-encode instead of relaying raw bytes: only valid JSON reaches the browser.
+	v, err := apisix.Decode(resp.Body)
+	if err != nil {
+		writeError(w, resp.Status, http.StatusText(resp.Status))
+		return
+	}
+	writeJSON(w, resp.Status, v)
 }
 
 func (s *Server) handleAPISIX(w http.ResponseWriter, r *http.Request, p *principal) {

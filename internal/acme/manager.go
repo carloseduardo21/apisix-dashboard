@@ -116,7 +116,9 @@ func (m *Manager) Run(ctx context.Context) {
 			c.LastError = "emissão interrompida pelo reinício da dashboard"
 			c.NextAttemptAt = time.Now()
 			c.UpdatedAt = time.Now()
-			m.Store.UpdateCertificate(ctx, c)
+			if err := m.Store.UpdateCertificate(ctx, c); err != nil {
+				slog.Error("acme: mark interrupted issuance", "id", c.ID, "err", err)
+			}
 		}
 	}
 	go func() {
@@ -262,7 +264,9 @@ func (m *Manager) issue(ctx context.Context, id int64, who Actor) {
 		return
 	}
 	run := &runLog{m: m, cert: c}
-	json.Unmarshal(c.Log, &run.entries)
+	if err := json.Unmarshal(c.Log, &run.entries); err != nil && len(c.Log) > 0 {
+		slog.Warn("acme: previous issuance log unreadable, starting a new one", "id", id, "err", err)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, issueTimeout)
 	defer cancel()
@@ -451,7 +455,7 @@ func verifyIssued(der [][]byte, key crypto.Signer, domains []string) (*issued, e
 	}
 	var chain strings.Builder
 	for _, b := range der {
-		pem.Encode(&chain, &pem.Block{Type: "CERTIFICATE", Bytes: b})
+		_ = pem.Encode(&chain, &pem.Block{Type: "CERTIFICATE", Bytes: b}) // strings.Builder writes never fail
 	}
 	sum := sha256.Sum256(der[0])
 	return &issued{certPEM: chain.String(), leaf: leaf, fingerprint: hex.EncodeToString(sum[:])}, nil
@@ -701,7 +705,7 @@ func adminError(body []byte) string {
 	var e struct {
 		ErrorMsg string `json:"error_msg"`
 	}
-	json.Unmarshal(body, &e)
+	_ = json.Unmarshal(body, &e) // non-JSON body: no message to show
 	return truncate(e.ErrorMsg, 300)
 }
 

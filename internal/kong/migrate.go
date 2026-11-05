@@ -193,7 +193,7 @@ func (m *Migrator) Plan(ctx context.Context, sel *Selection) (*Plan, error) {
 			pi.Action = ActionConflict
 		}
 		plan.Items = append(plan.Items, pi)
-		json.NewEncoder(h).Encode([]any{it.Path(), pi.Action, it.Body, pi.Current})
+		_ = json.NewEncoder(h).Encode([]any{it.Path(), pi.Action, it.Body, pi.Current}) // hash writes never fail
 	}
 	plan.Hash = hex.EncodeToString(h.Sum(nil))
 	return plan, nil
@@ -334,7 +334,7 @@ func subset(want, have any) bool {
 func generic(v any) any {
 	b, _ := json.Marshal(v)
 	var out any
-	json.Unmarshal(b, &out)
+	_ = json.Unmarshal(b, &out) // round-trip of a value we just marshaled
 	return out
 }
 
@@ -551,7 +551,7 @@ func (m *Migrator) write(ctx context.Context, it *PlanItem, a Actor) error {
 		var env struct {
 			Value map[string]any `json:"value"`
 		}
-		json.Unmarshal(resp.Body, &env)
+		_ = json.Unmarshal(resp.Body, &env) // non-JSON success body: audit records no "after"
 		after = env.Value
 	}
 	if err != nil {
@@ -609,10 +609,14 @@ func (m *Migrator) rollback(ctx context.Context, done []applied, a Actor) {
 		if err != nil {
 			continue
 		}
+		var serr error
 		if d.record != nil {
-			m.Store.UpsertKongMigration(ctx, d.record)
+			serr = m.Store.UpsertKongMigration(ctx, d.record)
 		} else {
-			m.Store.DeleteKongMigration(ctx, it.Kind, it.KongID)
+			serr = m.Store.DeleteKongMigration(ctx, it.Kind, it.KongID)
+		}
+		if serr != nil {
+			slog.Error("kong: rollback could not restore migration record", "kind", it.Kind, "kong_id", it.KongID, "err", serr)
 		}
 		m.update(func(j *Job) {
 			for k := range j.Results {
