@@ -33,7 +33,7 @@ type Options struct {
 	Auth         *auth.Service
 	APISIX       *apisix.Client
 	Catalog      *apisix.Catalog
-	ACME         *acme.Manager // nil when automatic issuance is disabled
+	ACME         *acme.Manager  // nil when automatic issuance is disabled
 	Kong         *kong.Migrator // nil when the Kong migration is disabled
 	Audit        *audit.Logger
 	Static       fs.FS
