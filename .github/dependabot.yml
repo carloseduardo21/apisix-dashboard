@@ -1,0 +1,74 @@
+version: 2
+
+# Version updates wait 7 days after a release (cooldown) so a compromised or
+# broken release is usually caught before it reaches us. Security updates are
+# not delayed.
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "build(deps)"
+    labels: [dependencies, go]
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    versioning-strategy: increase
+    commit-message:
+      prefix: "build(deps)"
+    labels: [dependencies, javascript]
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "react-router"]
+        update-types: [minor, patch]
+      mantine:
+        patterns: ["@mantine/*", "postcss-preset-mantine"]
+        update-types: [minor, patch]
+      i18n:
+        patterns: ["i18next", "react-i18next"]
+        update-types: [minor, patch]
+      tooling:
+        patterns: ["typescript", "vite", "@vitejs/*", "oxlint", "oxlint-tsgolint", "prettier", "postcss*"]
+        update-types: [minor, patch]
+      other-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci(deps)"
+    labels: [dependencies, github-actions]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "build(deps)"
+    labels: [dependencies, docker]
+    groups:
+      base-images:
+        patterns: ["*"]

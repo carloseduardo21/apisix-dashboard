@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+# Least privilege by default; jobs opt in to what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOVULNCHECK_VERSION: v1.9.0
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  TRIVY_VERSION: 0.76.1
+  TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
+
+jobs:
+  go:
+    name: Go · lint, test, vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint (includes gofmt/goimports checks)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+      - name: Test (race detector, coverage)
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
+      - name: govulncheck
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+  web:
+    name: Web · typecheck, lint, format, audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: npm audit (high and critical)
+        run: npm audit --audit-level=high
+
+  secrets:
+    name: Secrets · gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (checksum verified)
+        run: |
+          f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${f}"
+          echo "${GITLEAKS_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "${f}" gitleaks && sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: Scan full git history
+        run: gitleaks git --log-opts="--all" --redact --no-banner --exit-code 1 .
+
+  build:
+    name: Build · binary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make build VERSION="${GITHUB_SHA::12}"
+      - name: Smoke test
+        run: ./bin/apisix-dashboard version
+
+  image:
+    name: Image · build and Trivy scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write # upload Trivy SARIF (public repo only)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build --build-arg VERSION="${GITHUB_SHA::12}" -t apisix-dashboard:ci .
+      - name: Install Trivy (checksum verified)
+        run: |
+          f="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLO "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${f}"
+          echo "${TRIVY_SHA256}  ${f}" | sha256sum -c -
+          tar -xzf "${f}" trivy && sudo install -m 0755 trivy /usr/local/bin/trivy
+      - name: Trivy · Dockerfile misconfigurations (fail on HIGH/CRITICAL)
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL Dockerfile
+      - name: Trivy · image vulnerabilities (fail on fixable HIGH/CRITICAL)
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed apisix-dashboard:ci
+      - name: Trivy · SARIF report
+        if: ${{ always() && !github.event.repository.private }}
+        run: trivy image --format sarif --output trivy-image.sarif apisix-dashboard:ci
+      - name: Upload SARIF to code scanning
+        # Code scanning on private repositories requires GitHub Advanced Security.
+        if: ${{ always() && !github.event.repository.private && hashFiles('trivy-image.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
