@@ -159,8 +159,15 @@ make test                          # go test ./...
 make docker                        # distroless image
 ```
 
-Quality/security targets (`fmt`, `lint`, `lint-fast`, `vuln`, `dev`, `docker-build`) are
-introduced by the tooling setup; prefer the Makefile over ad-hoc commands once present.
+More targets (`make help`): `fmt`, `fmt-check`, `lint`, `lint-fast`, `test-race`,
+`cover`, `vuln`, `secrets`, `check` (= everything CI runs), `dev` (go run + Vite),
+`docker-build`. Prefer the Makefile over ad-hoc commands.
+
+Linters: **golangci-lint** (`.golangci.yml`: gosec, errcheck, govet, staticcheck, revive,
+…) and **Oxlint** (`web/.oxlintrc.json`, type-aware via typescript-go) + **Prettier**.
+ESLint/typescript-eslint is not used: it does not support TypeScript 7. Suppressions
+need a justification on the same line (`// #nosec Gxxx -- reason`,
+`// oxlint-disable-next-line rule -- reason`).
 
 ## Mandatory rules
 
@@ -194,12 +201,12 @@ introduced by the tooling setup; prefer the Makefile over ad-hoc commands once p
 
 A change is done only when all of the following pass locally (and in CI):
 
-- [ ] `make fmt` leaves no diff; `make lint` (golangci-lint incl. gosec, ESLint,
-      Prettier check, `tsc --noEmit`) has **zero** findings.
+- [ ] `make fmt` leaves no diff; `make lint` (golangci-lint incl. gosec, Oxlint
+      type-aware, Prettier check, `tsc --noEmit`) has **zero** findings.
 - [ ] `make test` passes; new behavior has tests (table-driven in Go; handler tests via
       `httptest` for new/changed routes).
-- [ ] `make vuln` (govulncheck + `npm audit --audit-level=high` / osv-scanner) shows no
-      new findings; gitleaks is clean.
+- [ ] `make vuln` (govulncheck + `npm audit --audit-level=high`) shows no new findings;
+      `make secrets` (gitleaks) is clean.
 - [ ] `make build` and `make docker` succeed.
 - [ ] Security checklist reviewed for the change (auth, validation, masking, audit,
       error leakage) — use `/security-check`.

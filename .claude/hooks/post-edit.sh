@@ -2,7 +2,7 @@
 # PostToolUse hook (Edit|Write): fast, per-file format + lint.
 #
 # - Go: gofmt -w, go vet on the package, golangci-lint --fast-only (if configured)
-# - web/: prettier --write, eslint on TS/TSX (if installed)
+# - web/: prettier --write, oxlint on TS/TSX (if installed)
 #
 # Exit 0 = ok. Exit 2 = problems found; stderr is fed back to Claude so it
 # fixes them. Missing tools are skipped silently so the hook never blocks
@@ -39,8 +39,8 @@ case "$rel" in
     fi
     case "$rel" in
       *.ts | *.tsx)
-        if [ -x "$bin/eslint" ] && ls "$root"/web/eslint.config.* >/dev/null 2>&1; then
-          out=$(cd "$root/web" && "$bin/eslint" --max-warnings 0 "$file" 2>&1) || fail "eslint $rel:" "$out"
+        if [ -x "$bin/oxlint" ] && [ -f "$root/web/.oxlintrc.json" ]; then
+          out=$(cd "$root/web" && "$bin/oxlint" --quiet "$file" 2>&1) || fail "oxlint $rel:" "$out"
         fi
         ;;
     esac

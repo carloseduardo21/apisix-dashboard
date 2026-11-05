@@ -3,6 +3,7 @@
 Read `.claude/CLAUDE.md` first; these rules add to it.
 
 ## Stack
+
 - Vite 8, React 19, **TypeScript strict** (`tsconfig.json`: `strict`,
   `noUnusedLocals`, `noUnusedParameters`), Mantine 9 (+ modals, notifications,
   spotlight), TanStack Query 5, React Router 8, `@tabler/icons-react`, `qrcode`.
@@ -12,6 +13,7 @@ Read `.claude/CLAUDE.md` first; these rules add to it.
   installs use `npm ci`.
 
 ## Layout
+
 ```
 src/api.ts            the only HTTP client (fetch, CSRF header, ApiError, types)
 src/auth.tsx          AuthGate / useAuth: session state, login flow gate
@@ -25,6 +27,7 @@ src/theme/            Mantine theme + global CSS
 ```
 
 ## Rules
+
 - **All backend calls go through `api()` in `src/api.ts`** (same origin, `/api/*`,
   `credentials: 'same-origin'`, `X-CSRF-Token` on non-GET). Never call the APISIX Admin
   API, Kong or any third-party origin from the browser; the CSP (`connect-src 'self'`)
@@ -53,10 +56,16 @@ src/theme/            Mantine theme + global CSS
   status). Prefer Mantine/stdlib-of-the-browser solutions.
 
 ## Commands
+
 ```bash
 npm ci
 npm run typecheck
 npm run build
 npm audit --audit-level=high
+npm run lint          # oxlint --type-aware --max-warnings 0
+npm run format        # prettier --write
 ```
-ESLint/Prettier scripts (`lint`, `format`) are added by the tooling setup.
+
+Lint is **Oxlint** (`.oxlintrc.json`), not ESLint: typescript-eslint does not support
+TypeScript 7. Disable a rule only inline with a reason:
+`// oxlint-disable-next-line <rule> -- <why>`.

@@ -1,0 +1,88 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - revive
+    - ineffassign
+    - unused
+    - bodyclose
+    - noctx
+    - errorlint
+    - misspell
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # struct layout churn, no security value
+        - shadow # `err` shadowing is idiomatic here
+    gosec:
+      excludes:
+        - G104 # unchecked errors: reported by errcheck instead (no duplicates)
+      config:
+        global:
+          audit: true
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true # internal packages; doc comments enforced in review
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+          disabled: true # http handlers keep a uniform signature
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    staticcheck:
+      checks:
+        - all
+        - -ST1000 # package comments: covered by revive
+        - -ST1003 # naming: covered by revive var-naming
+        - -QF1001 # De Morgan rewrite hurts readability of char-class checks
+        - -QF1008 # explicit embedded field selectors are kept for clarity
+    misspell:
+      locale: US
+      ignore-rules:
+        - cancelled
+        - clientes # PT-BR UI text (moves to i18n)
+  exclusions:
+    generated: strict
+    presets:
+      - std-error-handling
+    rules:
+      # Tests may use fixed fixtures and ignore errors on cleanup.
+      - path: _test\.go
+        linters: [gosec, errcheck, noctx]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/carloseduardo21/apisix-dashboard
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
