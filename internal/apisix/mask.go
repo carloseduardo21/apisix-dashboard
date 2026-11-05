@@ -1,0 +1,229 @@
+package apisix
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
+// Masked replaces secret values in everything sent to the browser and in the
+// audit trail (PCI DSS 3 / 8.3.2). When an object containing Masked is
+// written back, the original value is restored from APISIX (see Unmask).
+const Masked = "******"
+
+// Field names that hold secrets anywhere in an object, e.g. basic-auth
+// password, jwt-auth secret, openid-connect client_secret, vault token.
+var sensitiveKeys = map[string]bool{
+	"password":               true,
+	"redis_password":         true,
+	"secret":                 true,
+	"secret_key":             true,
+	"private_key":            true,
+	"client_key":             true, // upstream mTLS private key
+	"client_secret":          true,
+	"client_rsa_private_key": true,
+	"secret_access_key":      true,
+	"session_token":          true,
+	"token":                  true,
+	"api_key":                true,
+	"access_token":           true,
+}
+
+func isSensitive(key, parent string, topSSL bool) bool {
+	switch {
+	case sensitiveKeys[key]:
+		return true
+	case topSSL && (key == "key" || key == "keys"):
+		return true // SSL private keys
+	case parent == "key-auth" && key == "key":
+		return true
+	}
+	return false
+}
+
+// References to APISIX secret managers are not secrets themselves.
+func isReference(s string) bool {
+	return strings.HasPrefix(s, "$secret://") || strings.HasPrefix(s, "$env://")
+}
+
+// EncryptFieldsFunc returns the sensitive field paths of a plugin (see
+// Catalog.EncryptFields). It may be nil.
+type EncryptFieldsFunc func(plugin string) [][]string
+
+// Mask returns a copy of an object of the given resource with secrets masked:
+// fields matched by the static rules above plus, for each plugin in
+// "plugins", the encrypt_fields declared by APISIX.
+func Mask(resource string, v any, enc EncryptFieldsFunc) any {
+	out := maskValue(v, resource == "ssls", "")
+	if enc == nil {
+		return out
+	}
+	if m, ok := out.(map[string]any); ok {
+		if plugins, ok := m["plugins"].(map[string]any); ok {
+			for name, conf := range plugins {
+				for _, path := range enc(name) {
+					maskPath(conf, path)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// maskPath masks the value at a dotted path; arrays along the way are
+// traversed element by element ("instances.auth.header").
+func maskPath(v any, path []string) {
+	switch t := v.(type) {
+	case map[string]any:
+		val, ok := t[path[0]]
+		if !ok {
+			return
+		}
+		if len(path) == 1 {
+			t[path[0]] = maskAll(val)
+		} else {
+			maskPath(val, path[1:])
+		}
+	case []any:
+		for _, item := range t {
+			maskPath(item, path)
+		}
+	}
+}
+
+// maskAll masks every string inside v (used when a whole object, such as a
+// headers map, is declared sensitive).
+func maskAll(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, val := range t {
+			t[k] = maskAll(val)
+		}
+		return t
+	case []any:
+		for i, val := range t {
+			t[i] = maskAll(val)
+		}
+		return t
+	}
+	return maskLeaf(v)
+}
+
+func maskValue(v any, topSSL bool, parent string) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			if isSensitive(k, parent, topSSL) {
+				out[k] = maskLeaf(val)
+			} else {
+				out[k] = maskValue(val, false, k)
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = maskValue(val, false, parent)
+		}
+		return out
+	}
+	return v
+}
+
+func maskLeaf(v any) any {
+	switch t := v.(type) {
+	case string:
+		if t == "" || isReference(t) {
+			return t
+		}
+		return Masked
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = maskLeaf(val)
+		}
+		return out
+	case map[string]any:
+		return maskValue(t, false, "")
+	}
+	return v
+}
+
+// Unmask replaces Masked values in next with the value at the same path in
+// prev (the current object in APISIX). next is modified in place.
+func Unmask(next, prev any) (any, error) {
+	return unmask(next, prev, "")
+}
+
+func unmask(next, prev any, path string) (any, error) {
+	switch t := next.(type) {
+	case string:
+		if t != Masked {
+			return t, nil
+		}
+		if s, ok := prev.(string); ok {
+			return s, nil
+		}
+		return nil, fmt.Errorf("o campo %q contém um valor mascarado sem valor original; informe o valor real", strings.TrimPrefix(path, "."))
+	case map[string]any:
+		pm, _ := prev.(map[string]any)
+		for k, val := range t {
+			r, err := unmask(val, pm[k], path+"."+k)
+			if err != nil {
+				return nil, err
+			}
+			t[k] = r
+		}
+		return t, nil
+	case []any:
+		pa, _ := prev.([]any)
+		for i, val := range t {
+			var p any
+			if i < len(pa) {
+				p = pa[i]
+			}
+			r, err := unmask(val, p, fmt.Sprintf("%s[%d]", path, i))
+			if err != nil {
+				return nil, err
+			}
+			t[i] = r
+		}
+		return t, nil
+	}
+	return next, nil
+}
+
+// Decode parses JSON keeping numbers exact.
+func Decode(b []byte) (any, error) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var v any
+	if err := d.Decode(&v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+// MaskEnvelope masks an Admin API response: either {"value": ...} or
+// {"list": [{"value": ...}, ...]}.
+func MaskEnvelope(resource string, env any, enc EncryptFieldsFunc) any {
+	m, ok := env.(map[string]any)
+	if !ok {
+		return env
+	}
+	if v, ok := m["value"]; ok {
+		m["value"] = Mask(resource, v, enc)
+	}
+	if list, ok := m["list"].([]any); ok {
+		for _, item := range list {
+			if im, ok := item.(map[string]any); ok {
+				if v, ok := im["value"]; ok {
+					im["value"] = Mask(resource, v, enc)
+				}
+			}
+		}
+	}
+	return m
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./**/*.pem)", "Bash(git push --force:*)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "make fmt lint-fast" }]
+      }
+    ]
+  }
+}

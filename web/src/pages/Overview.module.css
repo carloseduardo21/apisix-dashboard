@@ -1,0 +1,54 @@
+.statLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--mantine-radius-md);
+}
+
+.stat {
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+
+  .statLink:hover & {
+    transform: translateY(-2px);
+    box-shadow: var(--mantine-shadow-md);
+    border-color: var(--mantine-color-indigo-light-color);
+  }
+}
+
+.statTitle {
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mantine-color-dimmed);
+}
+
+.statValue {
+  font-size: 34px;
+
+  @media (max-width: $mantine-breakpoint-xs) {
+    font-size: 26px;
+  }
+
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: var(--mantine-spacing-sm);
+}
+
+.statArrow {
+  color: var(--mantine-color-dimmed);
+  opacity: 0;
+  transition: opacity 150ms ease;
+
+  .statLink:hover & {
+    opacity: 1;
+  }
+}
+
+.statusOk {
+  border-left: 4px solid var(--mantine-color-teal-6);
+}
+
+.statusDown {
+  border-left: 4px solid var(--mantine-color-red-6);
+}

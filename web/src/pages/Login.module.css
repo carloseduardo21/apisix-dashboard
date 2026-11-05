@@ -1,0 +1,61 @@
+.wrapper {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-7));
+
+  @media (max-width: $mantine-breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brand {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px;
+  color: var(--mantine-color-white);
+  background: linear-gradient(140deg, var(--mantine-color-indigo-9) 0%, var(--mantine-color-indigo-7) 45%, var(--mantine-color-cyan-7) 100%);
+
+  @media (max-width: $mantine-breakpoint-md) {
+    display: none;
+  }
+}
+
+/* Soft network pattern in the background of the brand panel. */
+.brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(to bottom left, rgba(0, 0, 0, 0.9), transparent 70%);
+  pointer-events: none;
+}
+
+.brand > * {
+  position: relative;
+  z-index: 1;
+}
+
+.feature {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--mantine-radius-md);
+  padding: var(--mantine-spacing-md);
+  backdrop-filter: blur(4px);
+}
+
+.formSide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mantine-spacing-xl) var(--mantine-spacing-md);
+}
+
+.form {
+  width: 100%;
+  max-width: 400px;
+}

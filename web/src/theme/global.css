@@ -1,0 +1,10 @@
+/* App-wide tweaks on top of Mantine defaults. */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.9em;
+}
