@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { Group, Text } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 
 /** Gateway mark: traffic entering a hexagon and leaving split in two. */
 export function LogoMark({ size = 30 }: { size?: number }) {
@@ -28,15 +29,16 @@ export function LogoMark({ size = 30 }: { size?: number }) {
 }
 
 export function Logo({ size = 30 }: { size?: number }) {
+  const { t } = useTranslation()
   return (
     <Group gap={10} wrap="nowrap">
       <LogoMark size={size} />
       <div style={{ lineHeight: 1.1 }}>
         <Text fw={800} size="md" lh={1.1}>
-          APISIX
+          {t('app.name')}
         </Text>
         <Text size="xs" c="dimmed" fw={500} lh={1.1}>
-          Dashboard
+          {t('app.tagline')}
         </Text>
       </div>
     </Group>

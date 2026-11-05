@@ -19,12 +19,14 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { Spotlight, spotlight, type SpotlightActionData } from '@mantine/spotlight'
+import { useTranslation } from 'react-i18next'
 import {
   IconCertificate2,
   IconChevronRight,
   IconGauge,
   IconHistory,
   IconKey,
+  IconLanguage,
   IconLogout,
   IconMoon,
   IconPlus,
@@ -36,6 +38,7 @@ import {
 } from '@tabler/icons-react'
 import { api, canWrite, isAdmin } from '../api'
 import { useAuth } from '../auth'
+import { LANGUAGES, setLanguage } from '../i18n'
 import { RESOURCES } from '../resources'
 import { Logo } from './Logo'
 import { initials, ROLE_COLOR, ROLE_LABEL } from './roles'
@@ -45,7 +48,10 @@ interface Status {
   reachable: boolean
   server?: string
   latency_ms: number
+  // Set when the Admin API is unreachable (English text + translatable code).
   error?: string
+  code?: string
+  params?: Record<string, string>
 }
 
 /** Shared with the overview page: one request feeds both. */
@@ -54,11 +60,12 @@ export function useGatewayStatus() {
 }
 
 function GatewayIndicator() {
+  const { t } = useTranslation()
   const { data, isPending } = useGatewayStatus()
   if (isPending) return null
   const ok = !!data?.reachable
   return (
-    <Tooltip label={ok ? `Admin API conectada · ${data?.latency_ms} ms` : 'Admin API indisponível'}>
+    <Tooltip label={ok ? t('nav.gateway_online', { latency: data?.latency_ms }) : t('nav.gateway_offline')}>
       <Badge
         variant="light"
         color={ok ? 'teal' : 'red'}
@@ -70,13 +77,14 @@ function GatewayIndicator() {
         visibleFrom="sm"
         styles={{ section: { width: 12, display: 'flex', justifyContent: 'center' } }}
       >
-        {ok ? data?.server?.replace('/', ' ') || 'online' : 'offline'}
+        {ok ? data?.server?.replace('/', ' ') || t('overview.online') : t('overview.offline')}
       </Badge>
     </Tooltip>
   )
 }
 
 export function Layout() {
+  const { t, i18n } = useTranslation()
   const { me, logout } = useAuth()
   const [opened, { toggle, close }] = useDisclosure()
   const { setColorScheme } = useMantineColorScheme()
@@ -95,24 +103,24 @@ export function Layout() {
   const actions: SpotlightActionData[] = [
     {
       id: 'home',
-      label: 'Visão geral',
-      description: 'Status do gateway e resumo',
+      label: t('nav.overview'),
+      description: t('nav.overview_desc'),
       onClick: () => void navigate('/'),
       leftSection: <IconGauge size={20} stroke={1.5} />,
     },
     ...RESOURCES.map((r) => ({
       id: `go-${r.key}`,
-      label: r.label,
-      description: r.description,
-      keywords: [r.key, r.singular],
+      label: t(`resources.${r.key}.label`),
+      description: t(`resources.${r.key}.description`),
+      keywords: [r.key, t(`resources.${r.key}.singular`)],
       onClick: () => navigate(`/r/${r.key}`),
       leftSection: <r.icon size={20} stroke={1.5} />,
     })),
     {
       id: 'acme',
-      label: 'Certificados automáticos',
-      description: "Let's Encrypt via DNS (Cloudflare)",
-      keywords: ['acme', 'letsencrypt', 'renovar', 'tls'],
+      label: t('nav.acme'),
+      description: t('nav.acme_desc'),
+      keywords: t('nav.keywords_acme').split(' '),
       onClick: () => void navigate('/certificados'),
       leftSection: <IconCertificate2 size={20} stroke={1.5} />,
     },
@@ -120,9 +128,9 @@ export function Layout() {
       ? [
           {
             id: 'kong',
-            label: 'Migração do Kong',
-            description: 'Trazer services, rotas e consumers do Kong',
-            keywords: ['kong', 'migrar', 'importar'],
+            label: t('nav.kong_migration'),
+            description: t('nav.kong_desc'),
+            keywords: t('nav.keywords_kong').split(' '),
             onClick: () => navigate('/migracao/kong'),
             leftSection: <IconTransfer size={20} stroke={1.5} />,
           },
@@ -131,9 +139,12 @@ export function Layout() {
     ...(canWrite(me.role)
       ? RESOURCES.slice(0, 6).map((r) => ({
           id: `new-${r.key}`,
-          label: `Novo ${r.singular}`,
-          description: `Criar ${r.singular}`,
-          keywords: ['criar', 'novo', 'adicionar', r.key],
+          label: t('resources.new', {
+            context: t(`resources.${r.key}.gender`),
+            name: t(`resources.${r.key}.singular`),
+          }),
+          description: t('resources.create', { name: t(`resources.${r.key}.singular`) }),
+          keywords: [...t('nav.keywords_new').split(' '), r.key],
           onClick: () => navigate(`/r/${r.key}?novo=1`),
           leftSection: <IconPlus size={20} stroke={1.5} />,
         }))
@@ -142,15 +153,15 @@ export function Layout() {
       ? [
           {
             id: 'users',
-            label: 'Usuários',
-            description: 'Acessos à dashboard',
+            label: t('nav.users'),
+            description: t('nav.users_desc'),
             onClick: () => navigate('/usuarios'),
             leftSection: <IconUserShield size={20} stroke={1.5} />,
           },
           {
             id: 'audit',
-            label: 'Auditoria',
-            description: 'Trilha de eventos',
+            label: t('nav.audit'),
+            description: t('nav.audit_desc'),
             onClick: () => navigate('/auditoria'),
             leftSection: <IconHistory size={20} stroke={1.5} />,
           },
@@ -158,13 +169,13 @@ export function Layout() {
       : []),
     {
       id: 'password',
-      label: 'Alterar senha',
+      label: t('nav.change_password'),
       onClick: () => void navigate('/conta'),
       leftSection: <IconKey size={20} stroke={1.5} />,
     },
     {
       id: 'theme',
-      label: scheme === 'dark' ? 'Tema claro' : 'Tema escuro',
+      label: scheme === 'dark' ? t('nav.theme_light') : t('nav.theme_dark'),
       onClick: () => setColorScheme(scheme === 'dark' ? 'light' : 'dark'),
       leftSection: scheme === 'dark' ? <IconSun size={20} stroke={1.5} /> : <IconMoon size={20} stroke={1.5} />,
     },
@@ -188,7 +199,7 @@ export function Layout() {
                 <Group gap={8} wrap="nowrap">
                   <IconSearch size={15} stroke={1.8} />
                   <Text size="sm" visibleFrom="sm">
-                    Buscar...
+                    {t('nav.search')}
                   </Text>
                 </Group>
                 <Kbd size="xs" visibleFrom="sm">
@@ -197,12 +208,12 @@ export function Layout() {
               </Group>
             </UnstyledButton>
             <GatewayIndicator />
-            <Tooltip label={scheme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
+            <Tooltip label={scheme === 'dark' ? t('nav.theme_light') : t('nav.theme_dark')}>
               <ActionIcon
                 variant="default"
                 size={34}
                 onClick={() => setColorScheme(scheme === 'dark' ? 'light' : 'dark')}
-                aria-label="Alternar tema"
+                aria-label={t('nav.toggle_theme')}
               >
                 {scheme === 'dark' ? <IconSun size={18} stroke={1.6} /> : <IconMoon size={18} stroke={1.6} />}
               </ActionIcon>
@@ -213,27 +224,27 @@ export function Layout() {
 
       <AppShell.Navbar p="sm" className={classes.navbar}>
         <AppShell.Section grow component={ScrollArea} scrollbarSize={6}>
-          {link('/', 'Visão geral', IconGauge)}
-          <div className={classes.groupLabel}>Gateway</div>
+          {link('/', t('nav.overview'), IconGauge)}
+          <div className={classes.groupLabel}>{t('nav.gateway')}</div>
           {RESOURCES.flatMap((r) =>
             r.key === 'ssls'
               ? [
-                  link(`/r/${r.key}`, r.label, r.icon),
-                  link('/certificados', 'Certificados automáticos', IconCertificate2),
+                  link(`/r/${r.key}`, t(`resources.${r.key}.label`), r.icon),
+                  link('/certificados', t('nav.acme'), IconCertificate2),
                 ]
-              : [link(`/r/${r.key}`, r.label, r.icon)],
+              : [link(`/r/${r.key}`, t(`resources.${r.key}.label`), r.icon)],
           )}
           {canWrite(me.role) && (
             <>
-              <div className={classes.groupLabel}>Migração</div>
-              {link('/migracao/kong', 'Kong → APISIX', IconTransfer)}
+              <div className={classes.groupLabel}>{t('nav.migration')}</div>
+              {link('/migracao/kong', t('nav.kong'), IconTransfer)}
             </>
           )}
           {isAdmin(me.role) && (
             <>
-              <div className={classes.groupLabel}>Administração</div>
-              {link('/usuarios', 'Usuários', IconUserShield)}
-              {link('/auditoria', 'Auditoria', IconHistory)}
+              <div className={classes.groupLabel}>{t('nav.admin')}</div>
+              {link('/usuarios', t('nav.users'), IconUserShield)}
+              {link('/auditoria', t('nav.audit'), IconHistory)}
             </>
           )}
         </AppShell.Section>
@@ -251,7 +262,7 @@ export function Layout() {
                       {me.username}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      {ROLE_LABEL[me.role]}
+                      {t(ROLE_LABEL[me.role])}
                     </Text>
                   </div>
                   <IconChevronRight size={14} stroke={1.5} />
@@ -259,13 +270,28 @@ export function Layout() {
               </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Label>Versão {me.version}</Menu.Label>
+              <Menu.Label>{t('common.version', { version: me.version })}</Menu.Label>
               <Menu.Item component={RouterNavLink} to="/conta" leftSection={<IconKey size={16} />}>
-                Alterar senha
+                {t('nav.change_password')}
               </Menu.Item>
               <Menu.Divider />
+              <Menu.Label>
+                <IconLanguage size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
+                {t('common.language')}
+              </Menu.Label>
+              {LANGUAGES.map((l) => (
+                <Menu.Item
+                  key={l.code}
+                  onClick={() => setLanguage(l.code)}
+                  fw={i18n.language === l.code ? 700 : undefined}
+                  aria-current={i18n.language === l.code || undefined}
+                >
+                  {l.label}
+                </Menu.Item>
+              ))}
+              <Menu.Divider />
               <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={logout}>
-                Sair
+                {t('nav.logout')}
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -281,10 +307,10 @@ export function Layout() {
       <Spotlight
         actions={actions}
         shortcut={['mod + K', '/']}
-        nothingFound="Nada encontrado"
+        nothingFound={t('nav.nothing_found')}
         highlightQuery
         limit={12}
-        searchProps={{ leftSection: <IconSearch size={18} stroke={1.5} />, placeholder: 'Ir para... ou criar...' }}
+        searchProps={{ leftSection: <IconSearch size={18} stroke={1.5} />, placeholder: t('nav.search_placeholder') }}
       />
     </AppShell>
   )

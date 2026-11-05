@@ -6,6 +6,8 @@ import { IconCode, IconInfoCircle, IconRoute } from '@tabler/icons-react'
 import { api, itemId, type AdminItem, type AdminList } from '../api'
 import { asObj, stringRecord, text, textList, type Obj } from '../values'
 import { EmptyState } from './EmptyState'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 
 const arr = textList
 
@@ -14,9 +16,10 @@ function nodes(up: Obj | undefined): string[] {
   if (Array.isArray(n))
     return n.map((raw) => {
       const x = asObj(raw) ?? {}
-      return `${text(x.host)}:${text(x.port)}${x.weight !== undefined ? ` (peso ${text(x.weight)})` : ''}`
+      return `${text(x.host)}:${text(x.port)}${x.weight !== undefined ? ` (${i18n.t('service.weight', { weight: text(x.weight) })})` : ''}`
     })
-  if (n && typeof n === 'object') return Object.entries(n).map(([k, w]) => `${k} (peso ${text(w)})`)
+  if (n && typeof n === 'object')
+    return Object.entries(n).map(([k, w]) => `${k} (${i18n.t('service.weight', { weight: text(w) })})`)
   if (up?.service_name) return [`${text(up.discovery_type ?? 'discovery')}: ${text(up.service_name)}`]
   return []
 }
@@ -41,6 +44,7 @@ const none = (
 )
 
 function Upstream({ service }: { service: Obj }) {
+  const { t } = useTranslation()
   const id = typeof service.upstream_id === 'string' ? service.upstream_id : undefined
   const q = useQuery({
     queryKey: ['apisix', 'upstreams', id],
@@ -52,7 +56,7 @@ function Upstream({ service }: { service: Obj }) {
   if (!up)
     return id ? (
       <Text size="sm" c="red">
-        upstream {id} não encontrado
+        {t('service.upstream_missing', { id })}
       </Text>
     ) : (
       none
@@ -92,6 +96,7 @@ function Upstream({ service }: { service: Obj }) {
 
 /** Service summary with the routes bound to it. */
 export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
+  const { t } = useTranslation()
   const routes = useQuery({
     queryKey: ['apisix', 'routes'],
     queryFn: () => api<AdminList>('GET', '/api/apisix/routes'),
@@ -110,7 +115,7 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
     <Tabs defaultValue="summary" keepMounted={false}>
       <Tabs.List mb="md">
         <Tabs.Tab value="summary" leftSection={<IconInfoCircle size={16} />}>
-          Resumo
+          {t('service.summary')}
         </Tabs.Tab>
         <Tabs.Tab
           value="routes"
@@ -121,7 +126,7 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
             </Badge>
           }
         >
-          Routes
+          {t('service.routes')}
         </Tabs.Tab>
         <Tabs.Tab value="json" leftSection={<IconCode size={16} />}>
           JSON
@@ -131,18 +136,18 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
       <Tabs.Panel value="summary">
         <Stack>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <Field label="Nome">{text(value.name) || none}</Field>
+            <Field label={t('common.name')}>{text(value.name) || none}</Field>
             <Field label="ID">
               <Code>{id}</Code>
             </Field>
           </SimpleGrid>
-          <Field label="Descrição">{text(value.desc) || none}</Field>
-          <Field label="Upstream">
+          <Field label={t('common.description')}>{text(value.desc) || none}</Field>
+          <Field label={t('service.upstream')}>
             <Upstream service={value} />
           </Field>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <Field label="Hosts">{arr(value.hosts).join(', ') || none}</Field>
-            <Field label="WebSocket">{value.enable_websocket ? 'habilitado' : 'desabilitado'}</Field>
+            <Field label="WebSocket">{value.enable_websocket ? t('service.enabled') : t('service.disabled')}</Field>
           </SimpleGrid>
           <Field label="Plugins">
             {plugins.length ? (
@@ -157,7 +162,7 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
               none
             )}
           </Field>
-          <Field label="Labels">
+          <Field label={t('service.labels')}>
             {labels.length ? (
               <Group gap={4}>
                 {labels.map(([k, v]) => (
@@ -177,20 +182,16 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
         {routes.isPending ? (
           <Skeleton h={120} />
         ) : bound.length === 0 ? (
-          <EmptyState
-            icon={IconRoute}
-            title="Nenhuma route vinculada"
-            description="Routes com service_id igual a este service aparecem aqui."
-          />
+          <EmptyState icon={IconRoute} title={t('service.no_routes')} description={t('service.no_routes_desc')} />
         ) : (
           <Table.ScrollContainer minWidth={480}>
             <Table highlightOnHover verticalSpacing="xs" fz="sm">
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Nome</Table.Th>
+                  <Table.Th>{t('common.name')}</Table.Th>
                   <Table.Th>Hosts</Table.Th>
                   <Table.Th>URIs</Table.Th>
-                  <Table.Th>Status</Table.Th>
+                  <Table.Th>{t('common.status')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -210,7 +211,7 @@ export function ServiceDetails({ id, value }: { id: string; value: Obj }) {
                       <Table.Td ff="monospace">{arr(r.v.uris ?? r.v.uri).join(', ') || '—'}</Table.Td>
                       <Table.Td>
                         <Badge size="sm" color={on ? 'green' : 'gray'} variant="dot">
-                          {on ? 'ativo' : 'inativo'}
+                          {on ? t('common.active') : t('common.inactive')}
                         </Badge>
                       </Table.Td>
                     </Table.Tr>

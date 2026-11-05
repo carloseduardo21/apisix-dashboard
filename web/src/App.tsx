@@ -13,6 +13,7 @@ import { ChangePasswordForm } from './pages/Login'
 import { Overview } from './pages/Overview'
 import { ResourcePage } from './pages/ResourcePage'
 import { Users } from './pages/Users'
+import { useTranslation } from 'react-i18next'
 import { RESOURCE_BY_KEY } from './resources'
 
 function ResourceRoute() {
@@ -34,20 +35,17 @@ function WritersOnly({ children }: { children: React.ReactNode }) {
 }
 
 function Account() {
+  const { t } = useTranslation()
   return (
     <>
-      <PageHeader
-        icon={IconKey}
-        title="Alterar senha"
-        description="Ao trocar a senha, suas outras sessões são encerradas."
-      />
+      <PageHeader icon={IconKey} title={t('account.title')} description={t('account.description')} />
       <Card maw={520}>
         <ChangePasswordForm
           onDone={() =>
             notifications.show({
               color: 'teal',
-              title: 'Senha alterada',
-              message: 'Suas outras sessões foram encerradas.',
+              title: t('account.changed_title'),
+              message: t('account.changed_message'),
             })
           }
         />

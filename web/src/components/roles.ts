@@ -1,6 +1,11 @@
 import type { Role } from '../api'
 
-export const ROLE_LABEL: Record<Role, string> = { viewer: 'Leitura', operator: 'Operador', admin: 'Administrador' }
+/** Translation keys of the role names: t(ROLE_LABEL[role]). */
+export const ROLE_LABEL = {
+  viewer: 'roles.viewer',
+  operator: 'roles.operator',
+  admin: 'roles.admin',
+} as const satisfies Record<Role, string>
 export const ROLE_COLOR: Record<Role, string> = { viewer: 'gray', operator: 'indigo', admin: 'grape' }
 
 export function initials(name: string) {

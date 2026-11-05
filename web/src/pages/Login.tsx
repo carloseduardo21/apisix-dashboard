@@ -22,24 +22,19 @@ import { Logo, LogoMark } from '../components/Logo'
 import classes from './Login.module.css'
 import QRCode from 'qrcode'
 import { api, setCsrfToken, type Me } from '../api'
+import { useTranslation } from 'react-i18next'
+import { LanguageSelect } from '../components/LanguageSelect'
 
 function errText(e: unknown) {
   return e instanceof Error ? e.message : String(e)
 }
 
 function Brand() {
+  const { t } = useTranslation()
   const features = [
-    {
-      icon: IconShieldLock,
-      title: 'MFA obrigatório',
-      text: 'TOTP para todos os acessos, com bloqueio após tentativas inválidas.',
-    },
-    {
-      icon: IconHistory,
-      title: 'Trilha de auditoria',
-      text: 'Toda alteração no gateway registrada com o estado anterior e posterior.',
-    },
-    { icon: IconLock, title: 'Segredos protegidos', text: 'Chaves e senhas nunca chegam ao navegador nem aos logs.' },
+    { icon: IconShieldLock, title: t('login.feature_mfa_title'), text: t('login.feature_mfa') },
+    { icon: IconHistory, title: t('login.feature_audit_title'), text: t('login.feature_audit') },
+    { icon: IconLock, title: t('login.feature_secrets_title'), text: t('login.feature_secrets') },
   ]
   return (
     <div className={classes.brand}>
@@ -47,19 +42,19 @@ function Brand() {
         <LogoMark size={40} />
         <div>
           <Text fw={800} size="lg" lh={1.1}>
-            APISIX
+            {t('app.name')}
           </Text>
           <Text size="sm" opacity={0.8} lh={1.1}>
-            Dashboard
+            {t('app.tagline')}
           </Text>
         </div>
       </Group>
       <Stack gap="lg" maw={480}>
         <Title order={1} fz={40} lh={1.15} fw={800}>
-          Seu gateway sob controle.
+          {t('login.headline')}
         </Title>
         <Text size="lg" opacity={0.85}>
-          Gerencie routes, upstreams, consumers e plugins do Apache APISIX com segurança de ambiente PCI.
+          {t('login.subheadline')}
         </Text>
         <Stack gap="sm" mt="md">
           {features.map((f) => (
@@ -78,7 +73,7 @@ function Brand() {
         </Stack>
       </Stack>
       <Text size="xs" opacity={0.6}>
-        Acesso restrito a usuários autorizados. Todas as ações são registradas.
+        {t('login.restricted')}
       </Text>
     </div>
   )
@@ -90,9 +85,14 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
       <Brand />
       <div className={classes.formSide}>
         <div className={classes.form}>
-          <Box hiddenFrom="md" mb="xl">
-            <Logo size={36} />
-          </Box>
+          <Group justify="space-between" mb="xl" wrap="nowrap">
+            <Box hiddenFrom="md">
+              <Logo size={36} />
+            </Box>
+            <Box ml="auto">
+              <LanguageSelect />
+            </Box>
+          </Group>
           <Title order={2} fz={28} fw={700}>
             {title}
           </Title>
@@ -125,6 +125,7 @@ export function LoginFlow({ me, onDone }: { me: Me | null; onDone: () => void })
 }
 
 function PasswordStep({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -147,13 +148,13 @@ function PasswordStep({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Card title="Entrar" subtitle="Use suas credenciais da dashboard. O código MFA será solicitado em seguida.">
+    <Card title={t('login.title')} subtitle={t('login.subtitle')}>
       <form onSubmit={submit}>
         <Stack>
           <ErrorAlert error={error} />
           <TextInput
             size="md"
-            label="Usuário"
+            label={t('login.username')}
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.currentTarget.value)}
@@ -162,14 +163,14 @@ function PasswordStep({ onDone }: { onDone: () => void }) {
           />
           <PasswordInput
             size="md"
-            label="Senha"
+            label={t('login.password')}
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.currentTarget.value)}
             required
           />
           <Button type="submit" loading={loading} fullWidth size="md" mt="xs" variant="gradient">
-            Continuar
+            {t('login.continue')}
           </Button>
         </Stack>
       </form>
@@ -178,6 +179,7 @@ function PasswordStep({ onDone }: { onDone: () => void }) {
 }
 
 function LogoutLink({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   return (
     <Anchor
       component="button"
@@ -189,13 +191,14 @@ function LogoutLink({ onDone }: { onDone: () => void }) {
       }}
     >
       <Group gap={4}>
-        <IconArrowLeft size={14} /> Voltar ao login
+        <IconArrowLeft size={14} /> {t('login.back')}
       </Group>
     </Anchor>
   )
 }
 
 function MfaVerifyStep({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -217,7 +220,7 @@ function MfaVerifyStep({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Card title="Verificação em duas etapas" subtitle="Informe o código de 6 dígitos do seu aplicativo autenticador.">
+    <Card title={t('login.mfa_title')} subtitle={t('login.mfa_subtitle')}>
       <Stack align="center">
         <ErrorAlert error={error} />
         <PinInput
@@ -240,7 +243,7 @@ function MfaVerifyStep({ onDone }: { onDone: () => void }) {
           disabled={code.length !== 6}
           onClick={() => verify(code)}
         >
-          Verificar
+          {t('login.verify')}
         </Button>
         <LogoutLink onDone={onDone} />
       </Stack>
@@ -249,6 +252,7 @@ function MfaVerifyStep({ onDone }: { onDone: () => void }) {
 }
 
 function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
+  const { t } = useTranslation()
   const [secret, setSecret] = useState<{ secret: string; uri: string } | null>(null)
   const [qr, setQr] = useState('')
   const [code, setCode] = useState('')
@@ -279,25 +283,22 @@ function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
   }
 
   return (
-    <Card
-      title="Configure a autenticação em duas etapas"
-      subtitle={`O MFA é obrigatório. Escaneie o QR code com seu autenticador (Google Authenticator, Authy, 1Password...) para o usuário ${me.username}.`}
-    >
+    <Card title={t('login.enroll_title')} subtitle={t('login.enroll_subtitle', { username: me.username })}>
       <Stack align="center">
         <ErrorAlert error={error} />
         {qr && (
           <Paper withBorder p="sm" bg="white" radius="lg" shadow="sm">
-            <Image src={qr} w={190} h={190} alt="QR code TOTP" />
+            <Image src={qr} w={190} h={190} alt={t('login.qr_alt')} />
           </Paper>
         )}
         {secret && (
           <Text size="xs" c="dimmed" ta="center">
-            Ou digite a chave manualmente:
+            {t('login.manual_key')}
             <br />
             <Code>{secret.secret.replace(/(.{4})/g, '$1 ').trim()}</Code>
           </Text>
         )}
-        <Text size="sm">Depois, informe o código gerado:</Text>
+        <Text size="sm">{t('login.enter_code')}</Text>
         <PinInput
           length={6}
           type="number"
@@ -315,7 +316,7 @@ function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
           disabled={code.length !== 6}
           onClick={() => finish(code)}
         >
-          Ativar MFA
+          {t('login.enable_mfa')}
         </Button>
         <LogoutLink onDone={onDone} />
       </Stack>
@@ -323,13 +324,8 @@ function MfaEnrollStep({ me, onDone }: { me: Me; onDone: () => void }) {
   )
 }
 
-export function ChangePasswordForm({
-  onDone,
-  submitLabel = 'Alterar senha',
-}: {
-  onDone: () => void
-  submitLabel?: string
-}) {
+export function ChangePasswordForm({ onDone, submitLabel }: { onDone: () => void; submitLabel?: string }) {
+  const { t } = useTranslation()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -340,7 +336,7 @@ export function ChangePasswordForm({
     e.preventDefault()
     setError('')
     if (next !== confirm) {
-      setError('As senhas não conferem')
+      setError(t('login.passwords_mismatch'))
       return
     }
     setLoading(true)
@@ -362,29 +358,29 @@ export function ChangePasswordForm({
       <Stack>
         <ErrorAlert error={error} />
         <PasswordInput
-          label="Senha atual"
+          label={t('login.current_password')}
           autoComplete="current-password"
           value={current}
           onChange={(e) => setCurrent(e.currentTarget.value)}
           required
         />
         <PasswordInput
-          label="Nova senha"
-          description="Mínimo de 12 caracteres, com letras e números. Não pode repetir as últimas 4."
+          label={t('login.new_password')}
+          description={t('login.new_password_hint')}
           autoComplete="new-password"
           value={next}
           onChange={(e) => setNext(e.currentTarget.value)}
           required
         />
         <PasswordInput
-          label="Confirme a nova senha"
+          label={t('login.confirm_password')}
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.currentTarget.value)}
           required
         />
         <Button type="submit" loading={loading}>
-          {submitLabel}
+          {submitLabel ?? t('nav.change_password')}
         </Button>
       </Stack>
     </form>
@@ -392,13 +388,11 @@ export function ChangePasswordForm({
 }
 
 function ChangePasswordStep({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   return (
-    <Card
-      title="Troca de senha obrigatória"
-      subtitle="Sua senha foi definida por um administrador. Defina uma nova senha para continuar."
-    >
+    <Card title={t('login.change_title')} subtitle={t('login.change_subtitle')}>
       <Stack>
-        <ChangePasswordForm onDone={onDone} submitLabel="Salvar e continuar" />
+        <ChangePasswordForm onDone={onDone} submitLabel={t('login.save_continue')} />
         <Center>
           <LogoutLink onDone={onDone} />
         </Center>

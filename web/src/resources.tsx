@@ -14,20 +14,36 @@ import {
   IconLock,
   type Icon,
 } from '@tabler/icons-react'
+import type { ParseKeys } from 'i18next'
+import { useTranslation } from 'react-i18next'
+import i18n from './i18n'
+import { formatDate } from './i18n/format'
 import { asObj, text, type Obj } from './values'
 
 export interface Column {
-  label: string
+  /** Translation key of the header. */
+  label: ParseKeys
   render: (v: Obj, id: string) => ReactNode
 }
 
+export type ResourceKey =
+  | 'routes'
+  | 'services'
+  | 'upstreams'
+  | 'consumers'
+  | 'consumer_groups'
+  | 'ssls'
+  | 'plugin_configs'
+  | 'global_rules'
+  | 'stream_routes'
+  | 'protos'
+  | 'secrets'
+  | 'credentials'
+
+/** An APISIX resource. Its label, singular, gender and description come from
+ * the catalog: resources.<key>.* */
 export interface ResourceDef {
-  key: string
-  label: string
-  singular: string
-  /** Grammatical gender of singular ("Nova credencial"). */
-  feminine?: boolean
-  description: string
+  key: ResourceKey
   icon: Icon
   columns: Column[]
   /** How new objects are created. */
@@ -69,10 +85,11 @@ function Plugins({ v }: { v: Obj }) {
 }
 
 function Status({ v }: { v: Obj }) {
+  const { t } = useTranslation()
   const on = v.status === undefined || v.status === 1
   return (
     <Badge size="sm" color={on ? 'green' : 'gray'} variant="dot">
-      {on ? 'ativo' : 'inativo'}
+      {on ? t('common.active') : t('common.inactive')}
     </Badge>
   )
 }
@@ -105,65 +122,56 @@ const mono = (s: string) => (
 )
 
 const nameCol: Column = {
-  label: 'Nome',
+  label: 'columns.name',
   render: (v) => (
     <Text size="sm" fw={500}>
       {str(v.name) || '—'}
     </Text>
   ),
 }
-const idCol: Column = { label: 'ID', render: (_v, id) => mono(id) }
+const idCol: Column = { label: 'columns.id', render: (_v, id) => mono(id) }
 const descCol: Column = {
-  label: 'Descrição',
+  label: 'columns.description',
   render: (v) => (
     <Text size="sm" c="dimmed" lineClamp={1}>
       {str(v.desc) || '—'}
     </Text>
   ),
 }
-const pluginsCol: Column = { label: 'Plugins', render: (v) => <Plugins v={v} /> }
+const pluginsCol: Column = { label: 'columns.plugins', render: (v) => <Plugins v={v} /> }
 
 export const RESOURCES: ResourceDef[] = [
   {
     key: 'routes',
-    description: 'Regras que associam requisições a upstreams e plugins',
-    label: 'Routes',
-    singular: 'route',
     icon: IconRoute,
     create: 'post',
     columns: [
       idCol,
       nameCol,
-      { label: 'Hosts', render: (v) => mono(arr(v.hosts ?? v.host).join(', ')) },
-      { label: 'URIs', render: (v) => mono(arr(v.uris ?? v.uri).join(', ')) },
-      { label: 'Status', render: (v) => <Status v={v} /> },
+      { label: 'columns.hosts', render: (v) => mono(arr(v.hosts ?? v.host).join(', ')) },
+      { label: 'columns.uris', render: (v) => mono(arr(v.uris ?? v.uri).join(', ')) },
+      { label: 'columns.status', render: (v) => <Status v={v} /> },
     ],
     template: { name: '' },
     search: (v, id) => [id, v.name, v.uri, v.uris, v.host, v.hosts, v.desc].map(str).join(' '),
   },
   {
     key: 'services',
-    description: 'Agrupam configuração compartilhada entre routes',
-    label: 'Services',
-    singular: 'service',
     icon: IconStack2,
     create: 'post',
-    columns: [idCol, nameCol, descCol, { label: 'Destino', render: (v) => mono(upstreamText(v)) }, pluginsCol],
+    columns: [idCol, nameCol, descCol, { label: 'columns.target', render: (v) => mono(upstreamText(v)) }, pluginsCol],
     template: { name: '' },
     search: (v, id) => [id, v.name, v.desc].map(str).join(' '),
   },
   {
     key: 'upstreams',
-    description: 'Destinos de backend e balanceamento de carga',
-    label: 'Upstreams',
-    singular: 'upstream',
     icon: IconServer,
     create: 'post',
     columns: [
       idCol,
       nameCol,
       {
-        label: 'Balanceamento',
+        label: 'columns.balancing',
         render: (v) => (
           <Badge size="sm" variant="light">
             {str(v.type) || 'roundrobin'}
@@ -171,19 +179,19 @@ export const RESOURCES: ResourceDef[] = [
         ),
       },
       {
-        label: 'Nós',
+        label: 'columns.nodes',
         render: (v) =>
           mono(
             v.service_name ? `${text(v.discovery_type ?? 'discovery')}: ${text(v.service_name)}` : nodesText(v.nodes),
           ),
       },
-      { label: 'Esquema', render: (v) => <Text size="sm">{str(v.scheme) || 'http'}</Text> },
+      { label: 'columns.scheme', render: (v) => <Text size="sm">{str(v.scheme) || 'http'}</Text> },
       {
-        label: 'Health check',
+        label: 'columns.health_check',
         render: (v) =>
           v.checks ? (
             <Badge size="sm" color="teal" variant="light">
-              sim
+              {i18n.t('common.yes')}
             </Badge>
           ) : (
             <Text size="sm" c="dimmed">
@@ -197,14 +205,11 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'consumers',
-    description: 'Clientes da API e suas credenciais',
-    label: 'Consumers',
-    singular: 'consumer',
     icon: IconUsers,
     create: 'put-body',
     columns: [
       {
-        label: 'Usuário',
+        label: 'columns.user',
         render: (v) => (
           <Text size="sm" fw={500}>
             {str(v.username)}
@@ -212,7 +217,7 @@ export const RESOURCES: ResourceDef[] = [
         ),
       },
       descCol,
-      { label: 'Grupo', render: (v) => mono(str(v.group_id)) },
+      { label: 'columns.group', render: (v) => mono(str(v.group_id)) },
       pluginsCol,
     ],
     template: { username: '' },
@@ -220,9 +225,6 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'consumer_groups',
-    description: 'Plugins compartilhados entre consumers',
-    label: 'Consumer Groups',
-    singular: 'consumer group',
     icon: IconUsersGroup,
     create: 'put-id',
     columns: [idCol, descCol, pluginsCol],
@@ -231,30 +233,27 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'ssls',
-    description: 'Certificados TLS servidos pelo gateway',
-    label: 'Certificados SSL',
-    singular: 'certificado',
     icon: IconCertificate,
     create: 'post',
     columns: [
       idCol,
-      { label: 'SNIs', render: (v) => mono(arr(v.snis ?? v.sni).join(', ')) },
-      { label: 'Tipo', render: (v) => <Text size="sm">{str(v.type) || 'server'}</Text> },
+      { label: 'columns.snis', render: (v) => mono(arr(v.snis ?? v.sni).join(', ')) },
+      { label: 'columns.type', render: (v) => <Text size="sm">{str(v.type) || 'server'}</Text> },
       {
-        label: 'Origem',
+        label: 'columns.origin',
         render: (v) =>
           isManagedSSL('ssls', v) ? (
             <Badge size="sm" variant="light" color="orange">
-              automático
+              {i18n.t('columns.automatic')}
             </Badge>
           ) : (
             <Text size="sm" c="dimmed">
-              manual
+              {i18n.t('columns.manual')}
             </Text>
           ),
       },
       {
-        label: 'Validade',
+        label: 'columns.validity',
         render: (v) => {
           const end = typeof v.validity_end === 'number' ? new Date(v.validity_end * 1000) : null
           if (!end)
@@ -267,21 +266,18 @@ export const RESOURCES: ResourceDef[] = [
           const color = days < 0 ? 'red' : days < 30 ? 'orange' : 'green'
           return (
             <Badge size="sm" color={color} variant="light">
-              {end.toLocaleDateString('pt-BR')} ({days}d)
+              {formatDate(end)} ({days}d)
             </Badge>
           )
         },
       },
-      { label: 'Status', render: (v) => <Status v={v} /> },
+      { label: 'columns.status', render: (v) => <Status v={v} /> },
     ],
     template: {},
     search: (v, id) => [id, v.snis, v.sni].map(str).join(' '),
   },
   {
     key: 'plugin_configs',
-    description: 'Conjuntos reutilizáveis de plugins',
-    label: 'Plugin Configs',
-    singular: 'plugin config',
     icon: IconPlug,
     create: 'put-id',
     columns: [idCol, descCol, pluginsCol],
@@ -290,9 +286,6 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'global_rules',
-    description: 'Plugins executados em todas as requisições',
-    label: 'Global Rules',
-    singular: 'global rule',
     icon: IconWorld,
     create: 'put-id',
     columns: [idCol, pluginsCol],
@@ -301,26 +294,20 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'stream_routes',
-    description: 'Proxy TCP/UDP (camada 4)',
-    label: 'Stream Routes',
-    singular: 'stream route',
     icon: IconArrowsSplit,
     create: 'post',
     columns: [
       idCol,
-      { label: 'Porta', render: (v) => mono(str(v.server_port)) },
-      { label: 'Origem', render: (v) => mono(str(v.remote_addr)) },
-      { label: 'SNI', render: (v) => mono(str(v.sni)) },
-      { label: 'Destino', render: (v) => mono(upstreamText(v)) },
+      { label: 'columns.port', render: (v) => mono(str(v.server_port)) },
+      { label: 'columns.source', render: (v) => mono(str(v.remote_addr)) },
+      { label: 'columns.sni', render: (v) => mono(str(v.sni)) },
+      { label: 'columns.target', render: (v) => mono(upstreamText(v)) },
     ],
     template: {},
     search: (v, id) => [id, v.server_port, v.remote_addr, v.sni].map(str).join(' '),
   },
   {
     key: 'protos',
-    description: 'Definições Protobuf para gRPC',
-    label: 'Protos',
-    singular: 'proto',
     icon: IconFileCode,
     create: 'put-id',
     columns: [idCol, descCol],
@@ -329,24 +316,23 @@ export const RESOURCES: ResourceDef[] = [
   },
   {
     key: 'secrets',
-    description: 'Integração com gerenciadores de segredos',
-    label: 'Secrets',
-    singular: 'secret manager',
     icon: IconLock,
     create: 'put-id',
     columns: [
       idCol,
-      { label: 'URI', render: (v) => mono(str(v.uri)) },
-      { label: 'Prefixo', render: (v) => mono(str(v.prefix)) },
+      { label: 'columns.uri', render: (v) => mono(str(v.uri)) },
+      { label: 'columns.prefix', render: (v) => mono(str(v.prefix)) },
     ],
     template: {},
     search: (v, id) => [id, v.uri, v.prefix].map(str).join(' '),
   },
 ]
 
-export const RESOURCE_BY_KEY = Object.fromEntries(RESOURCES.map((r) => [r.key, r]))
+export const RESOURCE_BY_KEY: Partial<Record<string, ResourceDef>> = Object.fromEntries(
+  RESOURCES.map((r) => [r.key, r]),
+)
 
-export const MAIN_RESOURCES = [
+export const MAIN_RESOURCES: ResourceKey[] = [
   'routes',
   'services',
   'upstreams',
