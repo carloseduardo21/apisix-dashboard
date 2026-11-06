@@ -164,3 +164,109 @@ func TestMaskSSLShapeForAnyResource(t *testing.T) {
 		})
 	}
 }
+
+// Credentials found in APISIX 3.14 plugin schemas that are not declared in
+// encrypt_fields (see docs/security-review.md, M1).
+func TestMaskUndeclaredCredentials(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, resource, body string
+		secrets              []string // must not appear in the output
+		kept                 []string // must still appear
+	}{
+		{
+			name: "aws-lambda", resource: "routes",
+			body:    `{"plugins":{"aws-lambda":{"function_uri":"https://lambda.example.com","authorization":{"apikey":"AK1","iam":{"accesskey":"AKIAEXAMPLE","secretkey":"SK1","aws_region":"us-east-1"}}}}}`,
+			secrets: []string{"AK1", "SK1"}, kept: []string{"https://lambda.example.com", "AKIAEXAMPLE", "us-east-1"},
+		},
+		{
+			name: "azure-functions", resource: "routes",
+			body:    `{"plugins":{"azure-functions":{"function_uri":"https://fn.example.com","authorization":{"apikey":"AZ1","clientid":"client-1"}}}}`,
+			secrets: []string{"AZ1"}, kept: []string{"https://fn.example.com", "client-1"},
+		},
+		{
+			name: "http-logger", resource: "global_rules",
+			body:    `{"plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"Bearer HL1"}}}`,
+			secrets: []string{"HL1"}, kept: []string{"https://logs.example.com"},
+		},
+		{
+			name: "ai-proxy", resource: "routes",
+			body:    `{"plugins":{"ai-proxy":{"provider":"openai","auth":{"header":{"Authorization":"Bearer sk-AI1"},"query":{"key":"AI2"}},"options":{"model":"m"}}}}`,
+			secrets: []string{"sk-AI1", "AI2"}, kept: []string{"openai", `"model":"m"`},
+		},
+		{
+			name: "proxy-rewrite headers", resource: "services",
+			body:    `{"plugins":{"proxy-rewrite":{"uri":"/x","headers":{"set":{"Authorization":"Basic PR1","X-Api-Key":"PR2","X-Request-Source":"lintel"},"add":{"Private-Token":"PR3"}}}}}`,
+			secrets: []string{"PR1", "PR2", "PR3"}, kept: []string{`"/x"`, "lintel", "X-Request-Source"},
+		},
+		{
+			name: "forward-auth request headers are names only", resource: "routes",
+			body: `{"plugins":{"forward-auth":{"uri":"https://auth.example.com","request_headers":["Authorization"]}}}`,
+			kept: []string{"https://auth.example.com", "Authorization"},
+		},
+		{
+			name: "key-auth header option is a name", resource: "consumers",
+			body:    `{"plugins":{"key-auth":{"key":"KA1","header":"apikey","query":"apikey"}}}`,
+			secrets: []string{"KA1"}, kept: []string{`"header":"apikey"`, `"query":"apikey"`},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			in := decode(t, tc.body)
+			b, _ := json.Marshal(Mask(tc.resource, in, nil))
+			s := string(b)
+			for _, secret := range tc.secrets {
+				if strings.Contains(s, secret) {
+					t.Errorf("%q leaked: %s", secret, s)
+				}
+			}
+			for _, k := range tc.kept {
+				if !strings.Contains(s, k) {
+					t.Errorf("%q lost: %s", k, s)
+				}
+			}
+			// Masking works on a copy.
+			orig, _ := json.Marshal(in)
+			if !strings.Contains(string(orig), strings.Trim(firstOr(tc.secrets, ""), `"`)) {
+				t.Errorf("Mask modified its input: %s", orig)
+			}
+		})
+	}
+}
+
+func firstOr(s []string, def string) string {
+	if len(s) == 0 {
+		return def
+	}
+	return s[0]
+}
+
+func TestMaskPluginMetadata(t *testing.T) {
+	t.Parallel()
+	enc := func(plugin string) [][]string {
+		if plugin == "example-logger" {
+			return [][]string{{"auth", "pass"}} // not a static key: only encrypt_fields can mask it
+		}
+		return nil
+	}
+	v := decode(t, `{"id":"example-logger","host":"logs.example.com","auth":{"user":"u","pass":"PM1"}}`)
+	b, _ := json.Marshal(Mask("plugin_metadata", v, enc))
+	if strings.Contains(string(b), "PM1") || !strings.Contains(string(b), "logs.example.com") {
+		t.Errorf("unexpected plugin_metadata mask: %s", b)
+	}
+}
+
+// A masked credential is restored on save, like any other masked value.
+func TestUnmaskHeaderCredential(t *testing.T) {
+	t.Parallel()
+	orig := decode(t, `{"plugins":{"proxy-rewrite":{"headers":{"set":{"Authorization":"Basic PR1"}}}}}`)
+	b, _ := json.Marshal(Mask("routes", orig, nil))
+	got, err := Unmask(decode(t, string(b)), orig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, orig) {
+		t.Errorf("got %v, want %v", got, orig)
+	}
+}

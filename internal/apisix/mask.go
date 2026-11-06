@@ -30,6 +30,41 @@ var sensitiveKeys = map[string]bool{
 	"token":                  true,
 	"api_key":                true,
 	"access_token":           true,
+	"apikey":                 true, // aws-lambda, azure-functions authorization
+	"secretkey":              true, // aws-lambda authorization.iam
+	"auth_header":            true, // http-logger
+}
+
+// Maps whose entries are HTTP headers (or query parameters) set by a plugin,
+// e.g. proxy-rewrite headers.set, ai-proxy auth.header. Entries whose names
+// look like credentials are masked.
+var headerMaps = map[string]bool{
+	"headers":         true,
+	"header":          true,
+	"set":             true,
+	"add":             true,
+	"request_headers": true,
+	"extra_headers":   true,
+	"query":           true,
+}
+
+// credentialName reports whether a header or parameter name usually carries
+// a credential (Authorization, Cookie, X-API-Key, Private-Token...).
+func credentialName(name string) bool {
+	n := strings.ToLower(name)
+	for _, s := range []string{"authorization", "cookie", "api-key", "apikey", "api_key", "token", "secret", "password", "credential", "x-functions-key"} {
+		if strings.Contains(n, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// Whole objects that hold credentials, by plugin: every string inside is
+// masked. ai-proxy declares no encrypt_fields but its auth block carries the
+// LLM provider API keys (header and query maps).
+var secretBlocks = map[string]map[string]bool{
+	"ai-proxy": {"auth": true},
 }
 
 func isSensitive(key, parent string, topSSL bool) bool {
@@ -39,6 +74,8 @@ func isSensitive(key, parent string, topSSL bool) bool {
 	case topSSL && (key == "key" || key == "keys"):
 		return true // SSL private keys
 	case parent == "key-auth" && key == "key":
+		return true
+	case headerMaps[parent] && credentialName(key):
 		return true
 	}
 	return false
@@ -77,6 +114,12 @@ func Mask(resource string, v any, enc EncryptFieldsFunc) any {
 		return out
 	}
 	if m, ok := out.(map[string]any); ok {
+		// A plugin_metadata object is the metadata of the plugin named by its id.
+		if id, ok := m["id"].(string); ok && resource == "plugin_metadata" {
+			for _, path := range enc(id) {
+				maskPath(m, path)
+			}
+		}
 		if plugins, ok := m["plugins"].(map[string]any); ok {
 			for name, conf := range plugins {
 				for _, path := range enc(name) {
@@ -132,9 +175,12 @@ func maskValue(v any, topSSL bool, parent string) any {
 	case map[string]any:
 		out := make(map[string]any, len(t))
 		for k, val := range t {
-			if isSensitive(k, parent, topSSL) {
+			switch {
+			case secretBlocks[parent][k]:
+				out[k] = maskAll(maskValue(val, false, k)) // masks the copy, not the input
+			case isSensitive(k, parent, topSSL):
 				out[k] = maskLeaf(val)
-			} else {
+			default:
 				out[k] = maskValue(val, false, k)
 			}
 		}
