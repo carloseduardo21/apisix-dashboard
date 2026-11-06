@@ -64,6 +64,10 @@ func TestClientKey(t *testing.T) {
 func TestLoginThrottle(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t, func(o *Options, _ *auth.Config) { o.LoginRatePerMinute = 3 })
+	// Frozen clock: argon2id is slow under -race and a refill would make the
+	// test flaky.
+	frozen := time.Now()
+	h.srv.limiter.now = func() time.Time { return frozen }
 	body := `{"username":"nobody","password":"wrong-password-1"}`
 	for i := range 3 {
 		if rec := h.do(nil, http.MethodPost, "/api/auth/login", body); rec.Code != http.StatusUnauthorized {
