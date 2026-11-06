@@ -21,7 +21,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	// Never reuse a session that existed before login (session fixation).
 	if c, err := r.Cookie(cookieName); err == nil && c.Value != "" {
-		if sess, _, err := s.Auth.Authenticate(r.Context(), c.Value); err == nil {
+		if sess, _, err := s.Auth.Authenticate(r.Context(), c.Value, false); err == nil {
 			if err := s.Store.DeleteSession(r.Context(), sess.IDHash); err != nil {
 				slog.Error("login: delete previous session", "err", err)
 			}

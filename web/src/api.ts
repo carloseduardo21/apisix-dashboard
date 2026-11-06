@@ -6,6 +6,25 @@ import { isObj, text } from './values'
 let csrfToken = ''
 let onUnauthorized: (() => void) | null = null
 
+// Requests sent while the user is not interacting (status polling, refetches)
+// are marked as background so the backend does not extend the idle timeout:
+// an unattended tab must reach the 15 min idle limit (PCI DSS 8.2.8).
+const BACKGROUND_AFTER_MS = 30_000
+let lastActivity = Date.now()
+if (typeof window !== 'undefined') {
+  const markActive = () => {
+    lastActivity = Date.now()
+  }
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const) {
+    window.addEventListener(ev, markActive, { capture: true, passive: true })
+  }
+}
+
+/** Whether the user has been inactive long enough for requests to count as background. */
+export function isUserIdle(now = Date.now()): boolean {
+  return now - lastActivity > BACKGROUND_AFTER_MS
+}
+
 export function setCsrfToken(token: string) {
   csrfToken = token
 }
@@ -66,6 +85,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') headers['X-CSRF-Token'] = csrfToken
+  if (isUserIdle()) headers['X-Background'] = '1'
 
   const res = await fetch(path, {
     method,

@@ -25,9 +25,12 @@ import (
 )
 
 const (
-	cookieName  = "dash_session"
-	csrfHeader  = "X-CSRF-Token"
-	maxBodySize = 1 << 20
+	cookieName = "dash_session"
+	csrfHeader = "X-CSRF-Token"
+	// backgroundHeader marks requests the UI sends without user activity
+	// (polling); they do not extend the idle timeout.
+	backgroundHeader = "X-Background"
+	maxBodySize      = 1 << 20
 )
 
 type Options struct {
@@ -160,7 +163,7 @@ func (s *Server) require(a access, h handler) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "auth.not_authenticated", "not authenticated")
 			return
 		}
-		sess, user, err := s.Auth.Authenticate(r.Context(), c.Value)
+		sess, user, err := s.Auth.Authenticate(r.Context(), c.Value, r.Header.Get(backgroundHeader) != "1")
 		if errors.Is(err, auth.ErrSessionExpired) {
 			s.clearCookie(w)
 			writeUserError(w, http.StatusUnauthorized, err)

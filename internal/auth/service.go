@@ -185,7 +185,10 @@ func (s *Service) dropSession(ctx context.Context, idHash string) {
 }
 
 // Authenticate resolves a session token, enforcing idle and absolute timeouts.
-func (s *Service) Authenticate(ctx context.Context, token string) (*store.Session, *store.User, error) {
+// touch records the request as user activity (extends the idle timeout);
+// background requests such as status polling pass false, so an unattended
+// browser tab cannot keep a session alive (PCI DSS 8.2.8).
+func (s *Service) Authenticate(ctx context.Context, token string, touch bool) (*store.Session, *store.User, error) {
 	sess, err := s.store.GetSession(ctx, secure.HashToken(token))
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, ErrSessionExpired
@@ -209,6 +212,9 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*store.Sessio
 	}
 	if err != nil {
 		return nil, nil, err
+	}
+	if !touch {
+		return sess, u, nil
 	}
 	sess.LastSeen = now
 	if err := s.store.UpdateSession(ctx, sess); err != nil {
