@@ -8,6 +8,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -32,10 +33,20 @@ type Config struct {
 	SessionIdleTimeout time.Duration
 	SessionMaxLifetime time.Duration
 	CookieSecure       bool
-	TrustProxyHeaders  bool
+	// TrustProxyHeaders is the legacy switch for X-Forwarded-For: when no
+	// TrustedProxies are set, only the direct peer is trusted.
+	TrustProxyHeaders bool
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For /
+	// X-Real-IP headers are honored (DASH_TRUSTED_PROXIES).
+	TrustedProxies []netip.Prefix
 
 	MaxLoginAttempts int
 	LockoutDuration  time.Duration
+	// LoginConcurrency bounds concurrent password hashing (argon2id uses
+	// 64 MiB each); LoginRatePerMinute limits authentication attempts per
+	// client IP.
+	LoginConcurrency   int
+	LoginRatePerMinute int
 
 	// AuditLog is where audit events are mirrored as JSON lines, in addition
 	// to the local database: "stdout", "none" or a file path.
@@ -112,6 +123,11 @@ func Load() (*Config, error) {
 	c.CookieSecure = boolean("DASH_COOKIE_SECURE", true, &errs)
 	c.TrustProxyHeaders = boolean("DASH_TRUST_PROXY_HEADERS", false, &errs)
 	c.MaxLoginAttempts = integer("DASH_MAX_LOGIN_ATTEMPTS", 6, &errs)
+	c.LoginConcurrency = integer("DASH_LOGIN_CONCURRENCY", 2, &errs)
+	c.LoginRatePerMinute = integer("DASH_LOGIN_RATE_PER_MINUTE", 20, &errs)
+	if c.TrustedProxies, err = prefixes("DASH_TRUSTED_PROXIES"); err != nil {
+		errs = append(errs, err)
+	}
 	if c.ACME.CloudflareToken, err = secret("DASH_ACME_CLOUDFLARE_API_TOKEN"); err != nil {
 		errs = append(errs, err)
 	}
@@ -132,6 +148,12 @@ func Load() (*Config, error) {
 	}
 	if c.MaxLoginAttempts < 1 || c.MaxLoginAttempts > 10 {
 		errs = append(errs, errors.New("DASH_MAX_LOGIN_ATTEMPTS must be between 1 and 10"))
+	}
+	if c.LoginConcurrency < 1 || c.LoginConcurrency > 64 {
+		errs = append(errs, errors.New("DASH_LOGIN_CONCURRENCY must be between 1 and 64"))
+	}
+	if c.LoginRatePerMinute < 1 || c.LoginRatePerMinute > 1000 {
+		errs = append(errs, errors.New("DASH_LOGIN_RATE_PER_MINUTE must be between 1 and 1000"))
 	}
 	if c.EncryptionKeyFile == "" {
 		c.EncryptionKeyFile = filepath.Join(c.DataDir, "encryption.key")
@@ -166,7 +188,10 @@ func (c *Config) Warnings() []string {
 	if !c.CookieSecure {
 		w = append(w, "DASH_COOKIE_SECURE=false: session cookie will be sent over plain HTTP")
 	}
-	if c.TLSCertFile == "" && !c.TrustProxyHeaders {
+	if c.TrustProxyHeaders && len(c.TrustedProxies) == 0 {
+		w = append(w, "DASH_TRUST_PROXY_HEADERS is deprecated: only the direct peer is trusted as a proxy; set DASH_TRUSTED_PROXIES to the proxy addresses (CIDR list)")
+	}
+	if c.TLSCertFile == "" && !c.TrustProxyHeaders && len(c.TrustedProxies) == 0 {
 		w = append(w, "TLS is not enabled; terminate TLS in front of the dashboard")
 	}
 	if strings.HasPrefix(c.Kong.AdminURL, "http://") {
@@ -207,6 +232,28 @@ func duration(key string, def time.Duration, errs *[]error) time.Duration {
 		return def
 	}
 	return d
+}
+
+// prefixes parses a comma-separated list of CIDRs or single addresses.
+func prefixes(key string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, f := range strings.Split(env(key, ""), ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(f); err == nil {
+			out = append(out, p.Masked())
+			continue
+		}
+		a, err := netip.ParseAddr(f)
+		if err != nil {
+			return nil, fmt.Errorf("%s: invalid address or CIDR %q", key, f)
+		}
+		a = a.Unmap()
+		out = append(out, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return out, nil
 }
 
 func boolean(key string, def bool, errs *[]error) bool {

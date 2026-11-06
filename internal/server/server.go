@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -39,16 +40,22 @@ type Options struct {
 	Audit        *audit.Logger
 	Static       fs.FS
 	CookieSecure bool
-	TrustProxy   bool
-	TLS          bool
-	Version      string
+	// TrustProxy is the legacy DASH_TRUST_PROXY_HEADERS: without
+	// TrustedProxies, only the direct peer is trusted as a proxy.
+	TrustProxy     bool
+	TrustedProxies []netip.Prefix
+	// LoginRatePerMinute limits authentication attempts per client IP.
+	LoginRatePerMinute int
+	TLS                bool
+	Version            string
 }
 
 type Server struct {
 	Options
+	limiter *limiter
 }
 
-func New(o Options) *Server { return &Server{Options: o} }
+func New(o Options) *Server { return &Server{Options: o, limiter: newLimiter(o.LoginRatePerMinute)} }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -58,13 +65,14 @@ func (s *Server) Handler() http.Handler {
 	})
 
 	// Authentication. "pending" endpoints are reachable before MFA.
-	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	// Endpoints that check a password or an MFA code are rate limited per IP.
+	mux.HandleFunc("POST /api/auth/login", s.throttle(s.handleLogin))
 	mux.HandleFunc("GET /api/auth/me", s.require(access{pending: true, mustChange: true}, s.handleMe))
 	mux.HandleFunc("POST /api/auth/logout", s.require(access{pending: true, mustChange: true}, s.handleLogout))
-	mux.HandleFunc("POST /api/auth/mfa/verify", s.require(access{pending: true}, s.handleMFAVerify))
+	mux.HandleFunc("POST /api/auth/mfa/verify", s.throttle(s.require(access{pending: true}, s.handleMFAVerify)))
 	mux.HandleFunc("POST /api/auth/mfa/enroll/start", s.require(access{pending: true}, s.handleEnrollStart))
-	mux.HandleFunc("POST /api/auth/mfa/enroll/finish", s.require(access{pending: true}, s.handleEnrollFinish))
-	mux.HandleFunc("POST /api/auth/password", s.require(access{mustChange: true}, s.handleChangePassword))
+	mux.HandleFunc("POST /api/auth/mfa/enroll/finish", s.throttle(s.require(access{pending: true}, s.handleEnrollFinish)))
+	mux.HandleFunc("POST /api/auth/password", s.throttle(s.require(access{mustChange: true}, s.handleChangePassword)))
 
 	// Dashboard users and audit trail.
 	mux.HandleFunc("GET /api/users", s.require(access{admin: true}, s.handleListUsers))
@@ -192,20 +200,60 @@ func (s *Server) meta(r *http.Request) auth.Meta {
 	return auth.Meta{IP: s.clientIP(r), UserAgent: truncate(r.UserAgent(), 256)}
 }
 
+// clientIP returns the address recorded in sessions and the audit trail and
+// used for rate limiting. Forwarded headers are only honored when the direct
+// peer is a trusted proxy; the client is then the rightmost X-Forwarded-For
+// entry that is not a trusted proxy (entries further left are set by the
+// client and cannot be trusted).
 func (s *Server) clientIP(r *http.Request) string {
-	if s.TrustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
-		}
-		if xr := r.Header.Get("X-Real-IP"); xr != "" {
-			return strings.TrimSpace(xr)
-		}
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
 	}
-	return host
+	peer, err := netip.ParseAddr(host)
+	if err != nil {
+		return host
+	}
+	peer = peer.Unmap()
+	if !s.trustedProxy(peer, peer) {
+		return peer.String()
+	}
+	var hops []string
+	for _, v := range r.Header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(v, ",")...)
+	}
+	if len(hops) == 0 {
+		if a, err := netip.ParseAddr(strings.TrimSpace(r.Header.Get("X-Real-IP"))); err == nil {
+			return a.Unmap().String()
+		}
+		return peer.String()
+	}
+	client := peer
+	for i := len(hops) - 1; i >= 0; i-- {
+		a, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			break // malformed entry: stop at the last address we could trust
+		}
+		client = a.Unmap()
+		if !s.trustedProxy(client, peer) {
+			break
+		}
+	}
+	return client.String()
+}
+
+// trustedProxy reports whether a may set forwarded headers. With the legacy
+// DASH_TRUST_PROXY_HEADERS and no CIDR list, only the direct peer is trusted.
+func (s *Server) trustedProxy(a, peer netip.Addr) bool {
+	if len(s.TrustedProxies) > 0 {
+		for _, p := range s.TrustedProxies {
+			if p.Contains(a) {
+				return true
+			}
+		}
+		return false
+	}
+	return s.TrustProxy && a == peer
 }
 
 func (s *Server) setCookie(w http.ResponseWriter, token string) {
@@ -296,6 +344,9 @@ func handleErr(w http.ResponseWriter, err error) {
 		writeUserError(w, http.StatusUnauthorized, err)
 	case errors.Is(err, auth.ErrMFAState):
 		writeUserError(w, http.StatusConflict, err)
+	case errors.Is(err, auth.ErrBusy):
+		w.Header().Set("Retry-After", "1")
+		writeUserError(w, http.StatusTooManyRequests, err)
 	case errors.Is(err, store.ErrNotFound):
 		notFound(w)
 	default:
