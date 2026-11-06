@@ -3,7 +3,7 @@
 
 # Build stages run on the build machine's platform and cross-compile, so
 # multi-arch images (linux/amd64, linux/arm64) need no emulation.
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS web
+FROM --platform=$BUILDPLATFORM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
