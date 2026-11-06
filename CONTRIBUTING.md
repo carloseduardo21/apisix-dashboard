@@ -78,6 +78,11 @@ assistants but are the project's coding rules for humans too.
 - CI (lint, tests, vulnerability and secret scans, image build with Trivy, CodeQL)
   must be green.
 
+## Releases
+
+Maintainers release by merging the release PR that release-please keeps open; your
+commit messages become the changelog. See [docs/releasing.md](docs/releasing.md).
+
 ## Developer Certificate of Origin
 
 Lintel uses the [Developer Certificate of Origin 1.1](https://developercertificate.org/)

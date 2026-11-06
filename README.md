@@ -41,7 +41,19 @@ browser ──HTTPS──▶ lintel (apisix-dashboard) ──X-API-KEY──▶ 
   preview, ordered apply and automatic rollback.
 - UI in English, Brazilian Portuguese and Spanish; light and dark themes.
 
-## Quick start
+## Install
+
+Each [release](https://github.com/carloseduardo21/apisix-dashboard/releases) provides:
+
+- **Container image** (linux/amd64, linux/arm64):
+  `ghcr.io/carloseduardo21/apisix-dashboard:<version>`. Pin it by digest in production.
+- **Binaries** for linux/amd64 and linux/arm64, with checksums and SPDX SBOMs.
+
+Everything is signed with [cosign](https://github.com/sigstore/cosign) (keyless) and
+has SLSA build provenance. See [docs/releasing.md](docs/releasing.md#verifying-a-release)
+to verify a download before deploying it.
+
+## Quick start (from source)
 
 Requirements: Go 1.27+, Node 24+ and a reachable APISIX Admin API.
 
@@ -270,6 +282,9 @@ make dev                 # backend on :8080 + Vite on :5173 (proxies /api)
 make check               # everything CI runs: fmt-check, lint, test, vuln, secrets
 make help                # all targets
 ```
+
+Releases are automated with release-please and GoReleaser: see
+[docs/releasing.md](docs/releasing.md).
 
 Repository layout:
 

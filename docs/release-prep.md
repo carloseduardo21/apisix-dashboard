@@ -14,8 +14,8 @@ Each phase is approved by the maintainer before the next one starts.
 | 3 | Local tooling (Makefile, golangci-lint, Oxlint, Prettier, scanners) + all lint findings fixed | ✅ done |
 | 4 | CI/CD (CI, CodeQL, Trivy, Dependabot, Scorecard) + UI i18n (en, pt-BR, es) | ✅ done |
 | 5 | Governance and docs (README, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, CODEOWNERS, templates, licence) | ✅ done |
-| 6 | Releases and supply chain (release-please, GoReleaser, GHCR multi-arch, SBOM, cosign) | ⏳ next |
-| 7 | Application security review → `docs/security-review.md` | pending |
+| 6 | Releases and supply chain (release-please, GoReleaser, GHCR multi-arch, SBOM, cosign) | ✅ done (see `docs/releasing.md`) |
+| 7 | Application security review → `docs/security-review.md` | ⏳ next |
 
 ## Decisions taken
 
@@ -34,7 +34,9 @@ Each phase is approved by the maintainer before the next one starts.
 - TOTP issuer is **Lintel** for new MFA enrollments (existing ones keep the old name).
 - Repository settings: Dependabot alerts and private vulnerability reporting enabled;
   `main` protected (required CI checks, linear history, no force-push/deletion,
-  admins may bypass for direct maintainer pushes).
+  admins may bypass for direct maintainer pushes; `DCO sign-off` required too).
+- Squash merge only (PR title as commit title), branches deleted after merge;
+  repository description and topics set.
 
 ## Pending questions for the maintainer
 
@@ -45,7 +47,9 @@ Each phase is approved by the maintainer before the next one starts.
 
 ## Follow-ups
 
-- Add the `DCO sign-off` check to the required status checks of `main` after it has
-  run once on a pull request.
-- Consider allowing only squash merges (keeps Conventional Commit titles as the
-  changelog source for release-please in Phase 6).
+- Enable *Allow GitHub Actions to create and approve pull requests* (repository
+  settings → Actions → General) so release-please can open the release PR.
+- After v0.1.0: remove `release-as` from `release-please-config.json` and make the
+  GHCR package public.
+- Dependabot PRs opened before the DCO workflow existed need a rebase
+  (`@dependabot rebase`) to get the now-required `DCO sign-off` check.

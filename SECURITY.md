@@ -57,6 +57,12 @@ Not considered vulnerabilities on their own:
 - missing hardening headers on non-`/api` responses with no demonstrated impact;
 - reports from automated scanners without a demonstrated impact.
 
+## Verifying releases
+
+Release binaries and images are signed with cosign (keyless, GitHub OIDC) and carry
+SLSA build provenance. Verify them before deploying:
+[docs/releasing.md](docs/releasing.md#verifying-a-release).
+
 ## Hardening guidance
 
 See the *Security controls and PCI DSS 4.0* section of the [README](README.md) for

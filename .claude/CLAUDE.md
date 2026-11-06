@@ -9,6 +9,9 @@ treat every change as security-sensitive.
 - Licence: **Apache-2.0** (`LICENSE`, `NOTICE`). Contributions under the **DCO**
   (`git commit -s`, checked by `.github/workflows/dco.yml`); no CLA.
 - TOTP issuer shown in authenticator apps: **Lintel**.
+- Releases: release-please (release PR from Conventional Commits) → GoReleaser
+  (linux amd64/arm64 archives, checksums, SBOMs, cosign) + multi-arch GHCR image
+  (Trivy gate, cosign, SLSA provenance). Process and tool rationale: `docs/releasing.md`.
 - Public name: **Lintel for Apache APISIX** (ASF trademark policy). Never brand it
   "APISIX Dashboard" or imply it is an Apache project. Binary/module/repo keep the
   technical name `apisix-dashboard`.

@@ -1,4 +1,4 @@
-# Dashboard for Apache APISIX — developer tasks.
+# Lintel for Apache APISIX — developer tasks.
 # Run `make help` for the list of targets.
 
 SHELL := /usr/bin/env bash
@@ -14,6 +14,7 @@ GO_PKGS := ./...
 GOLANGCI_LINT_VERSION ?= v2.15.0
 GOVULNCHECK_VERSION   ?= v1.9.0
 GITLEAKS_VERSION      ?= v8.30.1
+GORELEASER_VERSION    ?= v2.19.0
 
 # Local toolchain installed under ~/.local (see README / CLAUDE.md).
 export PATH := $(HOME)/.local/go/bin:$(HOME)/go/bin:$(HOME)/.local/bin:$(PATH)
@@ -21,7 +22,7 @@ export PATH := $(HOME)/.local/go/bin:$(HOME)/go/bin:$(HOME)/.local/bin:$(PATH)
 NPM := npm --prefix web
 
 .PHONY: help tools fmt fmt-check lint lint-fast test test-race cover vuln secrets \
-        check web build run dev docker-build docker clean
+        check web build run dev docker-build docker release-check release-snapshot clean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"; printf "Targets:\n"} /^[a-zA-Z_-]+:.*##/{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -32,6 +33,8 @@ tools: ## Install pinned Go tools (govulncheck); check golangci-lint/gitleaks
 	  echo "WARN: install golangci-lint $(GOLANGCI_LINT_VERSION) (https://golangci-lint.run/docs/welcome/install/)"
 	@gitleaks version 2>/dev/null | grep -q "$(GITLEAKS_VERSION:v%=%)" || \
 	  echo "WARN: install gitleaks $(GITLEAKS_VERSION) (https://github.com/gitleaks/gitleaks/releases)"
+	@goreleaser --version 2>/dev/null | grep -q "$(GORELEASER_VERSION:v%=%)" || \
+	  echo "WARN: install goreleaser $(GORELEASER_VERSION) for release targets (https://github.com/goreleaser/goreleaser/releases)"
 	@test -d web/node_modules || $(NPM) ci
 
 ## ---- quality --------------------------------------------------------------
@@ -102,5 +105,11 @@ docker-build: ## Build the container image ($(IMAGE):$(VERSION))
 
 docker: docker-build ## Alias of docker-build
 
+release-check: ## Validate the GoReleaser configuration
+	goreleaser check
+
+release-snapshot: web ## Local release dry run into dist/ (no publish, no signing/SBOM)
+	goreleaser release --snapshot --clean --skip=sign,sbom
+
 clean: ## Remove build output
-	rm -rf bin coverage.out internal/web/dist/assets internal/web/dist/index.html
+	rm -rf bin dist coverage.out internal/web/dist/assets internal/web/dist/index.html
