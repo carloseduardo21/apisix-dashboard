@@ -49,8 +49,10 @@ type Options struct {
 	TrustedProxies []netip.Prefix
 	// LoginRatePerMinute limits authentication attempts per client IP.
 	LoginRatePerMinute int
-	TLS                bool
-	Version            string
+	// RestrictedPlugins may only be added or changed by admins.
+	RestrictedPlugins map[string]bool
+	TLS               bool
+	Version           string
 }
 
 type Server struct {

@@ -69,6 +69,16 @@ func (s *Server) handleKongSettings(w http.ResponseWriter, r *http.Request, p *p
 	if !readJSON(w, r, &set) {
 		return
 	}
+	current, err := s.Kong.Settings(r.Context())
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	set.Normalize() // compare rules in the form they are stored in
+	if err := s.restrictedKongRules(p.user.Role, set.PluginRules, current.PluginRules); err != nil {
+		writeUserError(w, http.StatusForbidden, err)
+		return
+	}
 	if err := s.Kong.SaveSettings(r.Context(), set, p.kongActor()); err != nil {
 		kongError(w, err)
 		return

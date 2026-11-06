@@ -25,18 +25,33 @@ const testPassword = "correct horse 42 battery"
 // fakeAdmin is a stand-in for the APISIX Admin API that records the raw
 // request URIs it receives and answers with a fixed body.
 type fakeAdmin struct {
-	mu   sync.Mutex
-	uris []string
-	body string
+	mu    sync.Mutex
+	uris  []string
+	calls []string // "METHOD URI"
+	body  string
 }
 
 func (f *fakeAdmin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.uris = append(f.uris, r.RequestURI)
+	f.calls = append(f.calls, r.Method+" "+r.RequestURI)
 	body := f.body
 	f.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = io.WriteString(w, body)
+}
+
+// writes returns the non-GET calls received.
+func (f *fakeAdmin) writes() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []string
+	for _, c := range f.calls {
+		if !strings.HasPrefix(c, "GET ") {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func (f *fakeAdmin) requests() []string {

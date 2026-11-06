@@ -270,3 +270,47 @@ func TestUnmaskHeaderCredential(t *testing.T) {
 		t.Errorf("got %v, want %v", got, orig)
 	}
 }
+
+func TestCheckMaskedDestinations(t *testing.T) {
+	t.Parallel()
+	prevLogger := `{"plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"Bearer real","batch_max_size":1}}}`
+	prevSecret := `{"uri":"https://vault.example.com","prefix":"kv/apisix","token":"real"}`
+	tests := []struct {
+		name, resource, next, prev string
+		wantErr                    bool
+	}{
+		{"same destination keeps the secret", "routes",
+			`{"plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"******","batch_max_size":5}}}`, prevLogger, false},
+		{"new destination with masked secret", "routes",
+			`{"plugins":{"http-logger":{"uri":"https://attacker.example.net","auth_header":"******"}}}`, prevLogger, true},
+		{"new destination with a new secret", "routes",
+			`{"plugins":{"http-logger":{"uri":"https://new.example.com","auth_header":"Bearer new"}}}`, prevLogger, false},
+		{"destination added with masked secret", "routes",
+			`{"plugins":{"openid-connect":{"client_secret":"******","discovery":"https://idp.example.net/.well-known"}}}`,
+			`{"plugins":{"openid-connect":{"client_secret":"real"}}}`, true},
+		{"other plugin changes do not matter", "routes",
+			`{"plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"******"},"forward-auth":{"uri":"https://auth2.example.com"}}}`,
+			`{"plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"Bearer real"},"forward-auth":{"uri":"https://auth.example.com"}}}`, false},
+		{"route uri is a match path, not a destination", "routes",
+			`{"uri":"/new","plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"******"}}}`,
+			`{"uri":"/old","plugins":{"http-logger":{"uri":"https://logs.example.com","auth_header":"Bearer real"}}}`, false},
+		{"nested destination", "routes",
+			`{"plugins":{"ai-proxy-multi":{"instances":[{"name":"a","override":{"endpoint":"https://attacker.example.net"},"auth":{"header":{"Authorization":"******"}}}]}}}`,
+			`{"plugins":{"ai-proxy-multi":{"instances":[{"name":"a","override":{"endpoint":"https://llm.example.com"},"auth":{"header":{"Authorization":"Bearer real"}}}]}}}`, true},
+		{"secret manager moved", "secrets",
+			`{"uri":"https://attacker.example.net","prefix":"kv/apisix","token":"******"}`, prevSecret, true},
+		{"secret manager unchanged", "secrets",
+			`{"uri":"https://vault.example.com","prefix":"kv/other","token":"******"}`, prevSecret, false},
+		{"create: nothing to restore", "routes",
+			`{"plugins":{"http-logger":{"uri":"https://x.example.com","auth_header":"******"}}}`, `null`, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := CheckMaskedDestinations(tc.resource, decode(t, tc.next), decode(t, tc.prev))
+			if (err != nil) != tc.wantErr {
+				t.Errorf("err = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}

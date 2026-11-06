@@ -95,6 +95,7 @@ Every secret also accepts a `_FILE` suffix (Docker/Swarm secrets).
 | `DASH_COOKIE_SECURE` | `true` | Send the session cookie over HTTPS only |
 | `DASH_TRUSTED_PROXIES` | — | Comma-separated CIDRs/addresses of reverse proxies allowed to set `X-Forwarded-For` / `X-Real-IP`. The client IP (audit, sessions, rate limiting) is the rightmost address that is not one of them |
 | `DASH_TRUST_PROXY_HEADERS` | `false` | **Deprecated**, use `DASH_TRUSTED_PROXIES`. When `true` without a list, only the direct peer is trusted (rightmost `X-Forwarded-For` entry) |
+| `DASH_RESTRICTED_PLUGINS` | code-running plugins¹ | Plugins only admins may add or change (comma-separated; `none` for no restriction). The route `script` field is always restricted |
 | `DASH_AUDIT_LOG` | `stdout` | Audit mirror as JSON lines: `stdout`, `none` or a file path |
 | `DASH_ACME_CLOUDFLARE_API_TOKEN` / `_FILE` | — | Enables automatic certificates |
 | `DASH_ACME_EMAIL` | — | Let's Encrypt account contact (optional) |
@@ -111,7 +112,11 @@ Every secret also accepts a `_FILE` suffix (Docker/Swarm secrets).
 | `DASH_KONG_TIMEOUT` | `30s` | Kong call timeout |
 
 In a container, the Go memory limit is set to 85% of the cgroup memory limit unless
-`GOMEMLIMIT` is set. Outbound requests honour `HTTPS_PROXY`. The server logs a warning at startup for
+`GOMEMLIMIT` is set. Outbound requests honour `HTTPS_PROXY`.
+
+¹ `serverless-pre-function`, `serverless-post-function`, `ext-plugin-pre-req`,
+`ext-plugin-post-req`, `ext-plugin-post-resp` and `body-transformer` (its templates
+can run Lua): they execute arbitrary code inside the APISIX workers. The server logs a warning at startup for
 every setting that deviates from PCI DSS defaults.
 
 ## Roles
@@ -123,6 +128,18 @@ every setting that deviates from PCI DSS defaults.
 | `admin` | `operator` + manage dashboard users, read the audit trail, manage automatic certificates |
 
 The last enabled admin cannot be removed, demoted or disabled.
+
+`operator` is a privileged role: it controls where the gateway sends traffic and which
+plugins run. Plugins that execute arbitrary code (`DASH_RESTRICTED_PLUGINS`) and route
+scripts can only be added or changed by an `admin`; operators can still edit the rest
+of those objects and remove them. A masked secret cannot be kept when the destination
+it is sent to (e.g. a logger `uri`, an OIDC `discovery` URL, a secret manager `uri`)
+changes in the same plugin: it must be entered again.
+
+Hardening on the APISIX side: remove the plugins you do not use from `plugins:` in
+`config.yaml` (especially the serverless and ext-plugin ones), change the default
+`data_encryption.keyring`, and keep etcd and the Admin API on networks the gateway
+cannot route to.
 
 ## Security controls and PCI DSS 4.0
 

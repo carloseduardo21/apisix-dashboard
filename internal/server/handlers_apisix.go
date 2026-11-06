@@ -210,11 +210,20 @@ func (s *Server) apisixWrite(w http.ResponseWriter, r *http.Request, p *principa
 
 	var payload []byte
 	if body != nil {
+		if err := apisix.CheckMaskedDestinations(target.Resource, body, before); err != nil {
+			writeUserError(w, http.StatusBadRequest, err)
+			return
+		}
 		restored, err := apisix.Unmask(body, before)
 		if err != nil {
 			if !writeUserError(w, http.StatusBadRequest, err) {
 				internalError(w, err)
 			}
+			return
+		}
+		if err := s.restrictedChange(p.user.Role, target, restored, before); err != nil {
+			s.recordChange(r, p, path, target, before, nil, audit.Failure, "denied: "+err.Error())
+			writeUserError(w, http.StatusForbidden, err)
 			return
 		}
 		payload, _ = json.Marshal(restored)

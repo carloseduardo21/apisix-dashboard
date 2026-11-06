@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,10 @@ type Config struct {
 	// client IP.
 	LoginConcurrency   int
 	LoginRatePerMinute int
+
+	// RestrictedPlugins can only be added or changed by admins: they run
+	// arbitrary code in the gateway (DASH_RESTRICTED_PLUGINS).
+	RestrictedPlugins []string
 
 	// AuditLog is where audit events are mirrored as JSON lines, in addition
 	// to the local database: "stdout", "none" or a file path.
@@ -126,6 +131,9 @@ func Load() (*Config, error) {
 	c.LoginConcurrency = integer("DASH_LOGIN_CONCURRENCY", 2, &errs)
 	c.LoginRatePerMinute = integer("DASH_LOGIN_RATE_PER_MINUTE", 20, &errs)
 	if c.TrustedProxies, err = prefixes("DASH_TRUSTED_PROXIES"); err != nil {
+		errs = append(errs, err)
+	}
+	if c.RestrictedPlugins, err = pluginList("DASH_RESTRICTED_PLUGINS", DefaultRestrictedPlugins); err != nil {
 		errs = append(errs, err)
 	}
 	if c.ACME.CloudflareToken, err = secret("DASH_ACME_CLOUDFLARE_API_TOKEN"); err != nil {
@@ -232,6 +240,43 @@ func duration(key string, def time.Duration, errs *[]error) time.Duration {
 		return def
 	}
 	return d
+}
+
+// DefaultRestrictedPlugins run arbitrary code inside APISIX (Lua functions,
+// Lua templates, external plugin runners).
+var DefaultRestrictedPlugins = []string{
+	"serverless-pre-function",
+	"serverless-post-function",
+	"ext-plugin-pre-req",
+	"ext-plugin-post-req",
+	"ext-plugin-post-resp",
+	"body-transformer",
+}
+
+var pluginNameRe = regexp.MustCompile(`^[a-z0-9_-]{1,128}$`)
+
+// pluginList parses a comma-separated list of plugin names. Unset or empty
+// means def; "none" means an empty list.
+func pluginList(key string, def []string) ([]string, error) {
+	v := env(key, "")
+	switch v {
+	case "":
+		return append([]string(nil), def...), nil
+	case "none":
+		return []string{}, nil
+	}
+	var out []string
+	for _, f := range strings.Split(v, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		if !pluginNameRe.MatchString(f) {
+			return nil, fmt.Errorf("%s: invalid plugin name %q", key, f)
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 // prefixes parses a comma-separated list of CIDRs or single addresses.

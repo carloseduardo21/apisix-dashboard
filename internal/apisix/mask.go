@@ -290,3 +290,119 @@ func MaskEnvelope(resource string, env any, enc EncryptFieldsFunc) any {
 	}
 	return m
 }
+
+// Fields that decide where a plugin, secret manager or plugin metadata sends
+// data (and so the secrets configured next to them).
+var destinationKeys = map[string]bool{
+	"uri":                    true,
+	"url":                    true,
+	"base_url":               true,
+	"endpoint":               true,
+	"endpoints":              true,
+	"endpoint_addr":          true,
+	"endpoint_addrs":         true,
+	"discovery":              true,
+	"function_uri":           true,
+	"token_endpoint":         true,
+	"introspection_endpoint": true,
+	"ldap_uri":               true,
+	"brokers":                true,
+	"broker_list":            true,
+	"redis_host":             true,
+	"redis_cluster_nodes":    true,
+	"host":                   true,
+	"server":                 true,
+	"servers":                true,
+	"address":                true,
+	"addr":                   true,
+}
+
+// CheckMaskedDestinations rejects a write that keeps a masked secret while
+// changing where that secret is sent: otherwise someone who cannot see a
+// secret could point its plugin at a host they control and receive it. The
+// scope is each plugin configuration, and the whole object for secret
+// managers and plugin metadata.
+func CheckMaskedDestinations(resource string, next, prev any) error {
+	nm, _ := next.(map[string]any)
+	pm, _ := prev.(map[string]any)
+	if nm == nil || pm == nil {
+		return nil // nothing to restore from: Unmask reports masked values
+	}
+	if resource == "secrets" || resource == "plugin_metadata" {
+		if err := checkScope(nm, pm, resource); err != nil {
+			return err
+		}
+	}
+	np, _ := nm["plugins"].(map[string]any)
+	pp, _ := pm["plugins"].(map[string]any)
+	for name, conf := range np {
+		if err := checkScope(conf, pp[name], "plugins."+name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkScope(next, prev any, scope string) error {
+	if !containsMasked(next) {
+		return nil
+	}
+	nd, pd := map[string]string{}, map[string]string{}
+	collectDestinations(next, "", nd)
+	collectDestinations(prev, "", pd)
+	if len(nd) != len(pd) {
+		return destinationChanged(scope)
+	}
+	for k, v := range nd {
+		if pd[k] != v {
+			return destinationChanged(scope)
+		}
+	}
+	return nil
+}
+
+func destinationChanged(scope string) error {
+	return i18n.E("apisix.masked_secret_destination_changed",
+		"{scope}: the destination changed, so masked secrets cannot be kept; enter them again", "scope", scope)
+}
+
+func containsMasked(v any) bool {
+	switch t := v.(type) {
+	case string:
+		return t == Masked
+	case map[string]any:
+		for _, x := range t {
+			if containsMasked(x) {
+				return true
+			}
+		}
+	case []any:
+		for _, x := range t {
+			if containsMasked(x) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// collectDestinations records the JSON value of every destination field by
+// its path.
+func collectDestinations(v any, path string, out map[string]string) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, x := range t {
+			p := path + "." + k
+			if destinationKeys[k] {
+				b, _ := json.Marshal(x)
+				out[p] = string(b)
+				continue
+			}
+			collectDestinations(x, p, out)
+		}
+	case []any:
+		for i, x := range t {
+			collectDestinations(x, fmt.Sprintf("%s[%d]", path, i), out)
+		}
+	}
+}

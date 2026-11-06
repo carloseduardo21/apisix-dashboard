@@ -95,7 +95,11 @@ deploy/                 Docker Swarm stack example
 - Self-service password change (revokes the user's other sessions).
 - **Roles** (enforced in the backend): `viewer` (read APISIX config), `operator`
   (+ create/update/delete APISIX objects, Kong migration), `admin` (+ dashboard users,
-  audit trail, ACME management).
+  audit trail, ACME management, **restricted plugins**: `DASH_RESTRICTED_PLUGINS`,
+  default serverless-*/ext-plugin-*/body-transformer, plus the route `script` field;
+  also Kong rules mapping to them).
+- Masked secrets are not restored when a destination field (`uri`, `endpoint*`,
+  `discovery`, `host`…) of the same plugin / secret manager changes.
 
 ### APISIX management (Admin API v3)
 - CRUD for: routes, services, upstreams, consumers, consumer groups, SSL certificates,

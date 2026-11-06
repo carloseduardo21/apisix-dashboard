@@ -740,7 +740,10 @@
     },
     "apisix": {
       "http_error": "the Admin API answered HTTP {status}",
+      "masked_secret_destination_changed": "{scope}: the destination changed, so masked secrets cannot be kept; enter them again",
       "masked_without_original": "field {field} contains a masked value with no original value; enter the real value",
+      "plugin_restricted": "only administrators can add or change the {plugin} plugin",
+      "script_restricted": "only administrators can add or change route scripts",
       "ssl_managed": "this SSL is issued automatically ({domains}); manage it under Automatic certificates",
       "unreachable": "could not reach the APISIX Admin API",
       "unsupported_resource": "unsupported resource"
@@ -896,6 +899,7 @@
         "label_reserved": "label '{key}' is reserved or empty",
         "label_value": "label '{key}': the value cannot be empty or contain spaces",
         "on_conflict": "invalid conflict policy",
+        "plugin_restricted": "only administrators can map Kong plugins to {plugin}",
         "rewrite_from": "host rewrite {n}: invalid source '{value}'",
         "rewrite_to": "host rewrite {n}: invalid target '{value}' (use host or host:port)",
         "route_status": "invalid route status",

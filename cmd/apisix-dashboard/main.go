@@ -176,6 +176,11 @@ func serve() error {
 			Mask: func(resource string, v any) any { return apisix.Mask(resource, v, catalog.EncryptFields) },
 		})
 	}
+	restricted := make(map[string]bool, len(cfg.RestrictedPlugins))
+	for _, name := range cfg.RestrictedPlugins {
+		restricted[name] = true
+	}
+	slog.Info("plugins restricted to admins", "plugins", cfg.RestrictedPlugins)
 	srv := server.New(server.Options{
 		Store:              st.store,
 		Auth:               st.auth,
@@ -189,6 +194,7 @@ func serve() error {
 		TrustProxy:         cfg.TrustProxyHeaders,
 		TrustedProxies:     cfg.TrustedProxies,
 		LoginRatePerMinute: cfg.LoginRatePerMinute,
+		RestrictedPlugins:  restricted,
 		TLS:                cfg.TLSCertFile != "",
 		Version:            version,
 	})

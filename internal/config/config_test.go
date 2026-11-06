@@ -84,3 +84,28 @@ func TestLegacyTrustProxyWarning(t *testing.T) {
 		t.Error("no deprecation warning once DASH_TRUSTED_PROXIES is set")
 	}
 }
+
+func TestRestrictedPluginsConfig(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    []string
+		wantErr bool
+	}{
+		{in: "", want: DefaultRestrictedPlugins},
+		{in: "none", want: []string{}},
+		{in: "serverless-pre-function, my_plugin", want: []string{"serverless-pre-function", "my_plugin"}},
+		{in: "Bad Name", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			t.Setenv("DASH_RESTRICTED_PLUGINS", tc.in)
+			got, err := pluginList("DASH_RESTRICTED_PLUGINS", DefaultRestrictedPlugins)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v", err)
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

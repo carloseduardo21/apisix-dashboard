@@ -740,7 +740,10 @@
     },
     "apisix": {
       "http_error": "a Admin API respondeu HTTP {status}",
+      "masked_secret_destination_changed": "{scope}: o destino mudou, então os segredos mascarados não podem ser mantidos; informe-os novamente",
       "masked_without_original": "o campo {field} contém um valor mascarado sem valor original; informe o valor real",
+      "plugin_restricted": "somente administradores podem adicionar ou alterar o plugin {plugin}",
+      "script_restricted": "somente administradores podem adicionar ou alterar scripts de rotas",
       "ssl_managed": "este SSL é emitido automaticamente ({domains}); gerencie-o em Certificados automáticos",
       "unreachable": "não foi possível contactar a Admin API do APISIX",
       "unsupported_resource": "recurso não suportado"
@@ -896,6 +899,7 @@
         "label_reserved": "o label '{key}' é reservado ou vazio",
         "label_value": "label '{key}': o valor não pode ser vazio nem ter espaços",
         "on_conflict": "política de conflito inválida",
+        "plugin_restricted": "somente administradores podem mapear plugins do Kong para {plugin}",
         "rewrite_from": "reescrita de host {n}: origem inválida '{value}'",
         "rewrite_to": "reescrita de host {n}: destino inválido '{value}' (use host ou host:porta)",
         "route_status": "status das rotas inválido",
