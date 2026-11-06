@@ -518,7 +518,7 @@ func (m *Migrator) run(plan *Plan, a Actor) {
 	})
 	m.logf(LevelInfo, "kong.log.done", "migration finished: {count} objects written", "count", len(done))
 	m.Audit.Record(ctx, store.AuditEvent{Actor: a.Name, IP: a.IP, Action: "kong.migration", Resource: "kong_migration",
-		Outcome: audit.Success, Detail: fmt.Sprintf("%d objetos gravados", len(done))})
+		Outcome: audit.Success, Detail: fmt.Sprintf("%d objects written", len(done))})
 }
 
 // writePath is where an item is PUT: consumers are written to the collection
