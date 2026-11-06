@@ -6,6 +6,9 @@ binary** with the React SPA embedded. It is the control plane of an entire API g
 treat every change as security-sensitive.
 
 - Repository / Go module: `github.com/carloseduardo21/apisix-dashboard`
+- Licence: **Apache-2.0** (`LICENSE`, `NOTICE`). Contributions under the **DCO**
+  (`git commit -s`, checked by `.github/workflows/dco.yml`); no CLA.
+- TOTP issuer shown in authenticator apps: **Lintel**.
 - Public name: **Lintel for Apache APISIX** (ASF trademark policy). Never brand it
   "APISIX Dashboard" or imply it is an Apache project. Binary/module/repo keep the
   technical name `apisix-dashboard`.
@@ -204,7 +207,7 @@ need a justification on the same line (`// #nosec Gxxx -- reason`,
    stdlib. Pin exact versions.
 8. **Do not change functional behavior without asking the maintainer** (security
    fixes included: propose first).
-9. **Conventional Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`,
+9. **Conventional Commits**, signed off (`git commit -s`, DCO): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`,
    `ci:`, `chore:`, `perf:`, `style:`, `revert:`; scope optional (`feat(acme): …`);
    `!` / `BREAKING CHANGE:` for breaking changes. English, imperative mood.
 10. Never read or print `.env`, `data/` (SQLite, `encryption.key`) or key/cert files.

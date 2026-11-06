@@ -1,203 +1,305 @@
-# APISIX Dashboard
+# Lintel for Apache APISIX
 
-Dashboard para o [Apache APISIX](https://apisix.apache.org/) (modo tradicional com etcd), pensada para ambientes PCI DSS.
-É um binário único, com o frontend embutido, que fala só com a **Admin API**. A admin key fica no servidor e nunca vai para o navegador.
+[![CI](https://github.com/carloseduardo21/apisix-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/carloseduardo21/apisix-dashboard/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/carloseduardo21/apisix-dashboard/actions/workflows/codeql.yml/badge.svg)](https://github.com/carloseduardo21/apisix-dashboard/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/carloseduardo21/apisix-dashboard/badge)](https://scorecard.dev/viewer/?uri=github.com/carloseduardo21/apisix-dashboard)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+A self-hosted web dashboard for the [Apache APISIX](https://apisix.apache.org/) Admin
+API (traditional mode with etcd), built for **PCI DSS 4.0** environments and Docker
+Swarm. It ships as a **single Go binary** with the web UI embedded, and talks only to
+the Admin API. The APISIX admin key stays on the server and never reaches the browser.
 
 ```
-navegador ──HTTPS──▶ apisix-dashboard ──X-API-KEY──▶ APISIX Admin API :9180 ──▶ etcd
-                       │ sessão, MFA, RBAC, auditoria
-                       └ SQLite (usuários, sessões, auditoria)
+browser ──HTTPS──▶ lintel (apisix-dashboard) ──X-API-KEY──▶ APISIX Admin API :9180 ──▶ etcd
+                     │ sessions, MFA, RBAC, audit trail, secret masking
+                     └ SQLite (users, sessions, audit, ACME and migration state)
 ```
 
-## Início rápido
+> Lintel is an independent project. It is **not** affiliated with, endorsed by or
+> part of the Apache Software Foundation. Apache, Apache APISIX and APISIX are
+> trademarks of the Apache Software Foundation.
+
+## Features
+
+- **Strong local authentication**: argon2id passwords, mandatory TOTP MFA, account
+  lockout, server-side sessions with idle and absolute timeouts, forced change of
+  temporary passwords. No default credentials.
+- **Role-based access**: `viewer`, `operator` and `admin`, enforced in the backend.
+- **Full APISIX management** (Admin API v3): routes, services, upstreams, consumers
+  and their credentials, consumer groups, SSL certificates, global rules, plugin
+  configs, plugin metadata, stream routes, protos and secret managers.
+- **Forms generated from APISIX's own JSON Schemas**, so new plugins and fields work
+  without a dashboard upgrade, plus a raw JSON tab on every object.
+- **Secret masking** in every response and in the audit trail, with transparent
+  restore when an object is saved back with the masked value.
+- **Audit trail** of every login, user change and APISIX change (masked
+  before/after), mirrored as JSON lines for your SIEM.
+- **Automatic certificates** (optional): Let's Encrypt DNS-01 through Cloudflare,
+  published as APISIX SSL objects with no reload.
+- **Kong → APISIX migration** (optional): read-only import from Kong 3.x with
+  preview, ordered apply and automatic rollback.
+- UI in English, Brazilian Portuguese and Spanish; light and dark themes.
+
+## Quick start
+
+Requirements: Go 1.27+, Node 24+ and a reachable APISIX Admin API.
 
 ```bash
-make build                      # requer Node 24+ e Go 1.27+
+make build                                            # web UI + binary in bin/
 export DASH_ADMIN_API_URL=http://127.0.0.1:9180
-export DASH_ADMIN_API_KEY=sua-admin-key
-./bin/apisix-dashboard user add -u admin -r admin    # pede a senha
-./bin/apisix-dashboard                               # http://localhost:8080
+export DASH_ADMIN_API_KEY=change-me                   # your APISIX admin key
+export DASH_COOKIE_SECURE=false                       # local HTTP testing only
+./bin/apisix-dashboard user add -u admin -r admin     # prompts for the password
+./bin/apisix-dashboard                                # http://localhost:8080
 ```
 
-No primeiro login, o usuário configura o MFA (TOTP) com qualquer app autenticador.
+On first login, each user enrolls MFA with any TOTP authenticator app.
 
-> Em HTTP puro, fora de `localhost`, o navegador não envia o cookie de sessão (`Secure`). Para testes locais sem TLS use `DASH_COOKIE_SECURE=false`.
+> Over plain HTTP (outside `localhost`) browsers do not send the `Secure` session
+> cookie. Use `DASH_COOKIE_SECURE=false` only for local tests without TLS.
 
-## Configuração
+## Configuration
 
-Toda a configuração vem de variáveis de ambiente. As variáveis com segredo aceitam o sufixo `_FILE` (compatível com Docker secrets).
+All configuration comes from environment variables (see [`.env.example`](.env.example)).
+Every secret also accepts a `_FILE` suffix (Docker/Swarm secrets).
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `DASH_ADMIN_API_URL` | — | URL da Admin API, ex.: `http://apisix:9180` (**obrigatória**) |
-| `DASH_ADMIN_API_KEY` / `_FILE` | — | Admin key do APISIX. Opcional apenas para APISIX de teste com `admin_key_required: false`; em produção, sempre defina |
-| `DASH_ADMIN_API_CA_FILE` | — | CA para Admin API em HTTPS |
-| `DASH_ADMIN_API_TIMEOUT` | `10s` | Timeout das chamadas à Admin API |
-| `DASH_LISTEN_ADDR` | `:8080` | Endereço de escuta |
-| `DASH_TLS_CERT_FILE` / `DASH_TLS_KEY_FILE` | — | Ativam HTTPS (TLS 1.2+) |
-| `DASH_DATA_DIR` | `./data` | Diretório do SQLite e da chave gerada |
-| `DASH_ENCRYPTION_KEY_FILE` | `$DATA_DIR/encryption.key` | Chave AES-256 (32 bytes, hex/base64) que cifra os segredos TOTP. Se não for informada, uma chave é gerada no diretório de dados |
-| `DASH_SESSION_IDLE_TIMEOUT` | `15m` | Timeout por inatividade (PCI 8.2.8) |
-| `DASH_SESSION_MAX_LIFETIME` | `12h` | Duração máxima da sessão |
-| `DASH_MAX_LOGIN_ATTEMPTS` | `6` | Falhas (senha ou MFA) até o bloqueio (PCI 8.3.4: no máximo 10) |
-| `DASH_LOCKOUT_DURATION` | `30m` | Duração do bloqueio (PCI 8.3.4: no mínimo 30 minutos) |
-| `DASH_COOKIE_SECURE` | `true` | Cookie só via HTTPS |
-| `DASH_TRUST_PROXY_HEADERS` | `false` | Usa `X-Forwarded-For` para o IP da auditoria (só atrás de proxy confiável) |
-| `DASH_AUDIT_LOG` | `stdout` | Cópia da auditoria em JSON lines: `stdout`, `none` ou caminho de arquivo |
-| `DASH_ACME_CLOUDFLARE_API_TOKEN` | — | Ativa os certificados automáticos (aceita `_FILE`) |
-| `DASH_ACME_EMAIL` | — | Contato da conta no Let's Encrypt (opcional) |
-| `DASH_ACME_RENEW_BEFORE` | `720h` | Antecedência da renovação (limitada a 1/3 da validade do certificado) |
-| `DASH_ACME_DIRECTORY` / `DASH_ACME_STAGING_DIRECTORY` | Let's Encrypt | Diretórios ACME de produção e staging |
-| `DASH_ACME_CA_FILE` | — | CA extra para falar com o diretório ACME (CA interna) |
-| `DASH_ACME_DNS_RESOLVER` | NS da zona | Servidor `host:porta` usado para conferir a propagação do TXT |
-| `DASH_ACME_PROPAGATION_TIMEOUT` | `2m` | Espera máxima pela propagação antes de pedir a validação |
-| `DASH_KONG_ADMIN_URL` | — | Admin API do Kong, ex.: `http://kong-admin:8001`. Ativa a migração do Kong |
-| `DASH_KONG_ADMIN_TOKEN` / `_FILE` | — | Token da Admin API do Kong, se exigido |
-| `DASH_KONG_ADMIN_TOKEN_HEADER` | `Kong-Admin-Token` | Header em que o token é enviado |
+| `DASH_ADMIN_API_URL` | — | Admin API URL, e.g. `http://apisix:9180` (**required**) |
+| `DASH_ADMIN_API_KEY` / `_FILE` | — | APISIX admin key. Optional only for test instances with `admin_key_required: false`; always set it in production |
+| `DASH_ADMIN_API_CA_FILE` | — | CA bundle for an HTTPS Admin API |
+| `DASH_ADMIN_API_TIMEOUT` | `10s` | Admin API call timeout |
+| `DASH_LISTEN_ADDR` | `:8080` | Listen address |
+| `DASH_TLS_CERT_FILE` / `DASH_TLS_KEY_FILE` | — | Enable native HTTPS (TLS 1.2+) |
+| `DASH_DATA_DIR` | `./data` | Directory for the SQLite database and the generated key |
+| `DASH_ENCRYPTION_KEY_FILE` | `$DASH_DATA_DIR/encryption.key` | AES-256 key (32 bytes, hex or base64) that encrypts TOTP secrets and the ACME account key. Generated on first start if not set: **back it up** |
+| `DASH_SESSION_IDLE_TIMEOUT` | `15m` | Idle session timeout (PCI 8.2.8) |
+| `DASH_SESSION_MAX_LIFETIME` | `12h` | Absolute session lifetime |
+| `DASH_MAX_LOGIN_ATTEMPTS` | `6` | Failed password or MFA attempts before lockout (PCI 8.3.4: at most 10) |
+| `DASH_LOCKOUT_DURATION` | `30m` | Lockout duration (PCI 8.3.4: at least 30 minutes) |
+| `DASH_COOKIE_SECURE` | `true` | Send the session cookie over HTTPS only |
+| `DASH_TRUST_PROXY_HEADERS` | `false` | Use `X-Forwarded-For` / `X-Real-IP` for the audit IP (only behind a trusted proxy) |
+| `DASH_AUDIT_LOG` | `stdout` | Audit mirror as JSON lines: `stdout`, `none` or a file path |
+| `DASH_ACME_CLOUDFLARE_API_TOKEN` / `_FILE` | — | Enables automatic certificates |
+| `DASH_ACME_EMAIL` | — | Let's Encrypt account contact (optional) |
+| `DASH_ACME_RENEW_BEFORE` | `720h` | Renewal lead time (capped at 1/3 of the certificate validity) |
+| `DASH_ACME_DIRECTORY` / `DASH_ACME_STAGING_DIRECTORY` | Let's Encrypt | Production and staging ACME directories |
+| `DASH_ACME_CA_FILE` | — | Extra CA to reach the ACME directory (internal CA) |
+| `DASH_ACME_DNS_RESOLVER` | zone NS | `host:port` used to check TXT propagation |
+| `DASH_ACME_PROPAGATION_TIMEOUT` | `2m` | Maximum wait for propagation before validation |
+| `DASH_KONG_ADMIN_URL` | — | Kong Admin API, e.g. `http://kong-admin:8001`. Enables Kong migration |
+| `DASH_KONG_ADMIN_TOKEN` / `_FILE` | — | Kong Admin API token, if required |
+| `DASH_KONG_ADMIN_TOKEN_HEADER` | `Kong-Admin-Token` | Header that carries the token |
 | `DASH_KONG_WORKSPACE` | — | Workspace (Kong Enterprise) |
-| `DASH_KONG_CA_FILE` | — | CA para a Admin API do Kong em HTTPS |
-| `DASH_KONG_TIMEOUT` | `30s` | Timeout das chamadas ao Kong |
+| `DASH_KONG_CA_FILE` | — | CA bundle for an HTTPS Kong Admin API |
+| `DASH_KONG_TIMEOUT` | `30s` | Kong call timeout |
 
-## Perfis
+Outbound requests honour `HTTPS_PROXY`. The server logs a warning at startup for
+every setting that deviates from PCI DSS defaults.
 
-| Perfil | Pode |
+## Roles
+
+| Role | Can |
 |---|---|
-| `viewer` | Visualizar a configuração do APISIX |
-| `operator` | `viewer` + criar, alterar e excluir recursos do APISIX |
-| `admin` | `operator` + gerenciar usuários da dashboard e consultar a auditoria |
+| `viewer` | Read the APISIX configuration |
+| `operator` | `viewer` + create, update and delete APISIX objects, run Kong migrations |
+| `admin` | `operator` + manage dashboard users, read the audit trail, manage automatic certificates |
 
-## Controles de segurança e PCI DSS 4.0
+The last enabled admin cannot be removed, demoted or disabled.
 
-| Requisito | Implementação |
+## Security controls and PCI DSS 4.0
+
+| Requirement | Implementation |
 |---|---|
-| 3 / 8.3.2: proteção de dados sensíveis | Segredos são **mascarados** (`******`) em toda resposta e na auditoria. A dashboard usa os `encrypt_fields` que cada plugin declara ao APISIX (cobertura automática de 44 plugins, incluindo campos aninhados) e também uma lista fixa (senhas, chaves privadas de SSL e mTLS, token do Vault...). Ao salvar com o valor mascarado, o backend recupera o valor original do APISIX. Referências `$secret://` e `$env://` aparecem normalmente |
-| 7.2: menor privilégio | Perfis `viewer`, `operator` e `admin`, aplicados no backend. Só os recursos da lista de permitidos ficam acessíveis na Admin API |
-| 8.2.8: timeout de sessão | Timeout de 15 min por inatividade e duração máxima de 12 h. Sessões ficam no servidor, com o token guardado como hash |
-| 8.3.1 / 8.4: MFA | TOTP (RFC 6238) obrigatório para todos os usuários, com proteção contra replay. O segredo é cifrado com AES-256-GCM |
-| 8.3.4: bloqueio de conta | Bloqueio por 30 min após 6 falhas de senha ou de MFA |
-| 8.3.5: primeira senha | Senha definida por admin é temporária, e o usuário precisa trocá-la no primeiro acesso |
-| 8.3.6 / 8.3.7: senhas | Mínimo de 12 caracteres, com letras e números. Argon2id. Não pode repetir as 4 últimas |
-| 10.2: trilha de auditoria | Login, logout, falhas, bloqueios, MFA, gestão de usuários (incluindo ações via CLI) e toda alteração no APISIX, com estado **antes e depois**, usuário, IP e resultado |
-| 10.3.3: proteção dos logs | Os eventos são espelhados em JSON no stdout/arquivo para envio ao SIEM |
-| 6.4: aplicações web | CSP restritiva, proteção contra CSRF (token + `Sec-Fetch-Site`/Origin), cookies `HttpOnly`/`Secure`/`SameSite=Strict`, HSTS, `X-Frame-Options` |
+| 3 / 8.3.2: protect sensitive data | Secrets are **masked** (`******`) in every response and in the audit trail, using the `encrypt_fields` each plugin declares to APISIX (including nested fields) plus a static list (passwords, SSL and mTLS private keys, Vault tokens…). Saving the masked value restores the original from APISIX. `$secret://` and `$env://` references are shown as-is |
+| 7.2: least privilege | `viewer`, `operator` and `admin` roles enforced in the backend. Only allowlisted Admin API resources are reachable |
+| 8.2.8: session timeout | 15 min idle timeout and 12 h absolute lifetime. Sessions are server-side and tokens are stored hashed |
+| 8.3.1 / 8.4: MFA | Mandatory TOTP (RFC 6238) for every user, with replay protection. Secrets encrypted with AES-256-GCM |
+| 8.3.4: account lockout | 30 min lockout after 6 failed password or MFA attempts |
+| 8.3.5: first-use passwords | Passwords set by an admin are temporary and must be changed at first login |
+| 8.3.6 / 8.3.7: passwords | At least 12 characters with letters and digits, must not contain the username, cannot reuse the last 4. Hashed with argon2id |
+| 10.2: audit trail | Logins, logouts, failures, lockouts, MFA, user management (UI and CLI) and every APISIX change, with **before and after**, actor, IP and outcome |
+| 10.3.3: protect audit logs | Events are mirrored as JSON lines to stdout or a file for SIEM shipping |
+| 6.4: public-facing web apps | Strict CSP, CSRF protection (token + `Sec-Fetch-Site`/`Origin`), `HttpOnly`/`Secure`/`SameSite=Strict` cookies, HSTS, `X-Frame-Options` |
 
-**O que fica por conta da operação:** envio dos logs ao SIEM, backup do volume `/data` e da chave de criptografia, TLS (direto na dashboard ou num proxy), isolamento da Admin API numa rede interna e revisão periódica dos acessos (8.2.6: desativar usuários inativos há mais de 90 dias).
+**Operator responsibilities:** ship the audit logs to a SIEM, back up the `/data`
+volume and the encryption key, provide TLS (natively or at a proxy), keep the Admin
+API on an internal network, and review access periodically (8.2.6: disable users
+inactive for more than 90 days).
 
-## Docker / Swarm
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Docker and Swarm
 
 ```bash
-make docker                       # imagem distroless, usuário não-root
+make docker            # distroless, non-root image with HEALTHCHECK
 ```
 
-Veja `deploy/docker-stack.yml`, que usa secrets para a admin key, a chave de criptografia e o TLS. Como o estado fica em SQLite, rode **uma réplica**, fixada no nó do volume.
+See [`deploy/docker-stack.yml`](deploy/docker-stack.yml), which uses Swarm secrets for
+the admin key, the encryption key and TLS. Because state lives in SQLite, run
+**exactly one replica**, pinned to the node that holds the volume.
 
 ## CLI
 
+The same binary provides the management CLI:
+
 ```
-apisix-dashboard user add -u NOME -r PERFIL   # senha via prompt ou stdin
-apisix-dashboard user passwd -u NOME          # senha temporária
-apisix-dashboard user reset-mfa -u NOME
-apisix-dashboard user unlock -u NOME
+apisix-dashboard user add -u NAME -r ROLE      # password from prompt or stdin
+apisix-dashboard user passwd -u NAME           # set a temporary password
+apisix-dashboard user reset-mfa -u NAME
+apisix-dashboard user unlock -u NAME
 apisix-dashboard user list
-apisix-dashboard healthcheck
+apisix-dashboard healthcheck                   # used by the container HEALTHCHECK
+apisix-dashboard version
 ```
 
-## Desenvolvimento
+## Forms and plugins
 
-```bash
-make test vet
-make audit          # govulncheck + npm audit (PCI 6.3)
-cd web && npm run dev   # Vite em :5173 com proxy de /api para :8080
-```
+Each resource has a form for day-to-day fields and a **JSON** tab that edits the same
+object. Fields APISIX knows but the form does not handle explicitly appear under
+"Advanced", generated from APISIX's own schemas (`/apisix/admin/schema/*`).
 
-Estrutura:
+Plugins use a form generated from each plugin's schema (`/apisix/admin/plugins?all=true`),
+so they follow the APISIX version in use, including new plugins. Sensitive fields are
+password inputs. Consumers use the authentication plugins' `consumer_schema`.
 
-```
-cmd/apisix-dashboard/   main + CLI
-internal/config         variáveis DASH_*
-internal/auth           senhas, TOTP, sessões, bloqueio, perfis
-internal/apisix         cliente da Admin API, lista de permitidos, mascaramento e catálogo de schemas
-internal/kong           leitura do Kong, tradução para o APISIX e aplicação por etapas
-internal/audit          trilha de auditoria
-internal/store          SQLite
-internal/server         HTTP API + middlewares de segurança
-internal/web            frontend embutido (gerado por web/)
-web/                    React + TypeScript + Mantine
-  src/schema/           gerador de formulários a partir de JSON Schema + editor de plugins
-  src/forms/            formulários por recurso
-```
+**Consumer credentials** (APISIX 3.10+) live in the consumer panel (row menu →
+*Credentials*). A consumer can have several credentials (key-auth, basic-auth,
+jwt-auth, hmac-auth…), e.g. one per application, so one can be rotated or revoked
+without affecting the others. Secrets are masked and, when left as `******` on edit,
+keep their current value.
 
-## Formulários
+## Automatic certificates (Let's Encrypt)
 
-Cada recurso tem um formulário próprio para os campos do dia a dia e uma aba **JSON** que edita o mesmo objeto. Campos que o APISIX conhece mas o formulário não trata explicitamente aparecem em "Avançado", gerados a partir do schema do próprio APISIX (`/apisix/admin/schema/*`).
+Lintel issues and renews certificates through the **DNS-01 challenge on Cloudflare**
+and publishes them to APISIX as SSL objects, applied without a reload. No acme.sh,
+certificate volume or `server` block in `config.yaml` is needed. Wildcards are
+supported.
 
-Os plugins usam um formulário gerado a partir do schema de cada um (`/apisix/admin/plugins?all=true`), então acompanham a versão do APISIX em uso, inclusive plugins novos. Campos sensíveis viram campo de senha. Os consumers usam o `consumer_schema` dos plugins de autenticação.
+Each issuance, visible live on the **Automatic certificates** screen:
 
-**Credenciais de consumers** (APISIX 3.10+) ficam no painel do consumer (menu da linha → *Credenciais*). Cada consumer pode ter várias credenciais (key-auth, basic-auth, jwt-auth, hmac-auth…), por exemplo uma por aplicação, para trocar ou revogar uma sem afetar as outras. O formulário só oferece plugins de autenticação. Os segredos aparecem mascarados e, se mantidos como `******` na edição, preservam o valor atual. Cada alteração entra na auditoria como `consumers` / `usuario/credentials/id`.
+1. Order at the CA → `_acme-challenge` TXT record created at Cloudflare.
+2. Wait for propagation on the zone's authoritative name servers → the CA validates.
+3. Fresh key generated (ECDSA P-256 or RSA 2048) → certificate checked (covers the
+   domains, matches the key) → `PUT /ssls/{id}`.
+4. TXT record removed, including when issuance fails.
 
-## Certificados automáticos (Let's Encrypt)
+Renewal happens 30 days before expiry (checked hourly). Failures retry with
+exponential backoff (1 h, 2 h, 4 h… up to 24 h), respecting Let's Encrypt rate
+limits. Use the **staging** directory to test before issuing in production.
 
-A dashboard emite e renova certificados pelo desafio **DNS-01 na Cloudflare** e os publica no APISIX como objetos SSL, aplicados sem reload. Não há acme.sh, volume de certificados nem bloco `server` no `config.yaml`. Wildcards são suportados.
+Security notes:
 
-Fluxo de cada emissão, visível em tempo real na tela **Certificados automáticos**:
+- **Private keys** are generated per issuance and sent only to APISIX; the dashboard
+  never stores them or writes them to the audit trail. In etcd they are encrypted by
+  `apisix.data_encryption.keyring`: **change APISIX's default keyring**, it is public.
+- The **ACME account key** is encrypted with the dashboard encryption key.
+- Give the **Cloudflare token** only **Zone · DNS · Edit** on the zones you need, and
+  deliver it as a secret (`DASH_ACME_CLOUDFLARE_API_TOKEN_FILE`).
+- Automatically managed SSLs are **locked** against manual edit and delete in the
+  generic screens, so the next renewal cannot silently undo a manual change.
+- Registration, every issuance (manual or automatic renewal, with fingerprints before
+  and after) and failures are audited.
 
-1. Pedido na CA → TXT `_acme-challenge` criado na Cloudflare.
-2. Espera a propagação nos servidores autoritativos da zona → a CA valida.
-3. Chave nova gerada (ECDSA P-256 ou RSA 2048) → certificado conferido (cobre os domínios, bate com a chave) → `PUT /ssls/{id}`.
-4. TXT removido, inclusive quando a emissão falha.
+Required egress (for PCI firewall rules): HTTPS to `acme-v02.api.letsencrypt.org` and
+`api.cloudflare.com`; DNS (port 53) to the zone's name servers for the propagation
+check (if blocked, a warning is logged and validation proceeds).
 
-Renovação automática 30 dias antes do vencimento (verificada de hora em hora). Falhas tentam de novo com espera crescente (1h, 2h, 4h… até 24h), respeitando os limites do Let's Encrypt. Use o ambiente **staging** para testar antes de emitir em produção.
+To **take over an existing certificate**, register the domains with the same SSL id
+and tick "replace": the current certificate keeps being served until the new one is
+issued.
 
-Segurança:
+## Kong → APISIX migration
 
-- **Chave privada:** gerada a cada emissão e enviada só ao APISIX. Nunca é gravada na dashboard nem aparece na auditoria. No etcd, ela fica cifrada pelo `apisix.data_encryption.keyring`. **Troque o keyring padrão do APISIX**, porque ele é público.
-- **Conta ACME:** a chave fica cifrada com a chave de criptografia da dashboard.
-- **Token da Cloudflare:** use um token com permissão **Zone · DNS · Edit** só nas zonas necessárias, entregue como Docker secret (`DASH_ACME_CLOUDFLARE_API_TOKEN_FILE`).
-- **Proteção contra edição manual:** um SSL emitido automaticamente fica bloqueado para edição e exclusão pelas telas comuns, para que a próxima renovação não desfaça uma alteração manual sem ninguém perceber. Ao remover o certificado automático, você escolhe entre manter o SSL (que vira um SSL comum) ou excluí-lo.
-- **Auditoria:** cadastro, cada emissão (manual ou `acme:renovação-automática`, com fingerprint antes e depois) e falhas.
+The **Migration → Kong → APISIX** screen (`operator` and `admin`) moves the
+configuration of a Kong 3.x (DB mode) deployment to APISIX in steps. Lintel only
+**reads** from Kong.
 
-Saída de rede necessária (para regras de firewall no PCI):
+1. **Settings** define how everything is translated: id strategy (Kong name or id)
+   and prefix, routes created disabled (to enable at cutover), conflict policy for
+   objects that already exist in APISIX, policy for untranslatable plugins, host
+   rewrites (e.g. Kong DNS → Swarm service name), extra labels and **plugin rules**.
+2. **Inventory**: services with upstreams, routes and plugins; consumers with
+   credentials; global plugins. Each item shows whether it is to migrate, migrated,
+   changed in Kong since migration, or blocked, plus translation warnings.
+3. **Preview**: the exact JSON of each object, side by side with the current APISIX
+   object when it exists. Secrets are masked.
+4. **Apply** writes upstreams → services → consumers → credentials → routes → global
+   rules. If any object fails, everything the batch wrote is rolled back. Apply is
+   accepted only if Kong and APISIX are still as they were at preview time.
 
-- HTTPS para `acme-v02.api.letsencrypt.org` e `api.cloudflare.com`.
-- DNS (porta 53) para os name servers da zona, usado na conferência da propagação. Se essa porta estiver bloqueada, a dashboard só registra um aviso e segue com a validação.
-- Proxy de saída: `HTTPS_PROXY` é respeitado.
-
-Para **migrar um certificado existente**, cadastre os domínios com o mesmo ID do SSL e marque "substituir". O certificado atual continua sendo servido até o novo ser emitido.
-
-## Migração do Kong
-
-A tela **Migração → Kong → APISIX** (perfis `operator` e `admin`) traz a configuração de um Kong 3.x com banco de dados para o APISIX em etapas. A dashboard só **lê** do Kong.
-
-1. **Padrões:** definem como tudo é traduzido e valem para todas as etapas: estratégia de ID (nome ou ID do Kong) e prefixo, rotas criadas desabilitadas (para ativar no cutover), o que fazer com objetos que já existem no APISIX, plugins sem tradução (bloquear ou migrar sem), reescrita de hosts (ex.: DNS do Kong → nome do serviço no Swarm), labels extras e **regras de plugins**.
-2. **Inventário:** services com upstream, rotas e plugins; consumers com credenciais; plugins globais. Cada item mostra se está a migrar, migrado, alterado no Kong desde a migração ou bloqueado, com os avisos da tradução.
-3. **Pré-visualização:** o JSON exato de cada objeto e, se já existir no APISIX, o atual lado a lado. Os segredos aparecem mascarados.
-4. **Aplicar:** grava na ordem upstreams → services → consumers → credenciais → rotas → global rules. Se um objeto falhar, o que o lote gravou é desfeito. O apply só é aceito se o Kong e o APISIX ainda estiverem como na pré-visualização.
-
-Selecionar um service leva o upstream, os plugins e todas as rotas. Também dá para escolher rotas avulsas. Rodar de novo é seguro: o que não mudou aparece como "migrado" e não é regravado.
+Re-running is safe: unchanged objects show as "migrated" and are not rewritten.
 
 | Kong | APISIX |
 |---|---|
-| Service + Upstream/Targets | `upstream` (nós, balanceamento, health checks, timeouts, retries, `pass_host`) + `service` |
-| Route | `route`: paths por prefixo viram `uris` com `*`, paths regex (`~`) e headers viram `vars`, e `strip_path` + path do service viram `proxy-rewrite.regex_uri` |
-| Consumer + key-auth, jwt, hmac-auth | `consumer` + credenciais. Os grupos de ACL viram o label `groups` |
-| Plugins globais | `global_rules` |
+| Service + Upstream/Targets | `upstream` (nodes, balancing, health checks, timeouts, retries, `pass_host`) + `service` |
+| Route | `route`: prefix paths become `uris` with `*`, regex paths (`~`) and headers become `vars`, `strip_path` + service path become `proxy-rewrite.regex_uri` |
+| Consumer + key-auth, jwt, hmac-auth | `consumer` + credentials; ACL groups become the `groups` label |
+| Global plugins | `global_rules` |
 
-Plugins traduzidos: `key-auth`, `basic-auth`, `jwt`, `hmac-auth`, `acl` (plugin `acl` do APISIX), `rate-limiting` (`limit-count`, com uma regra por janela), `cors`, `ip-restriction`, `request-transformer` e `response-transformer` (só headers), `correlation-id`, `prometheus`, `file-log`, `http-log`, `tcp-log`, `udp-log`, `proxy-cache`, `request-size-limiting`, `bot-detection`, `request-termination` e `openid-connect`. Diferenças de comportamento viram avisos no inventário.
+Translated plugins: `key-auth`, `basic-auth`, `jwt`, `hmac-auth`, `acl`,
+`rate-limiting` (`limit-count`, one rule per window), `cors`, `ip-restriction`,
+`request-transformer` and `response-transformer` (headers only), `correlation-id`,
+`prometheus`, `file-log`, `http-log`, `tcp-log`, `udp-log`, `proxy-cache`,
+`request-size-limiting`, `bot-detection`, `request-termination` and
+`openid-connect`. Behavioural differences become inventory warnings.
 
-**Plugins custom:** crie uma regra em Padrões que mapeia o plugin do Kong para o do APISIX com um template JSON. Por exemplo, `{"nivel": "${config.nivel}", "limite": "${config.limite|10}", "rota": "${apisix.route_id}"}`. A regra vale para todas as ocorrências do plugin, e também pode simplesmente ignorá-lo.
+**Custom plugins:** add a rule in Settings that maps the Kong plugin to an APISIX one
+with a JSON template, e.g.
+`{"level": "${config.level}", "limit": "${config.limit|10}", "route": "${apisix.route_id}"}`.
+A rule can also simply drop the plugin.
 
-Limitações conhecidas:
+Known limitations:
 
-- As senhas de **basic-auth** não migram, porque o Kong guarda só o hash.
-- O header de assinatura do **hmac-auth** é diferente entre os dois gateways.
-- Services TCP/UDP (stream), rotas por expressão e plugins por consumer group não são suportados.
-- Se uma credencial for recriada no Kong, a antiga continua no APISIX: a pré-visualização avisa quando a chave colide.
+- **basic-auth** passwords cannot be migrated: Kong stores only the hash.
+- The **hmac-auth** signature header differs between the two gateways.
+- TCP/UDP (stream) services, expression routes and consumer-group plugins are not
+  supported.
+- If a credential is recreated in Kong, the old one stays in APISIX; the preview warns
+  when keys collide.
 
-Cada gravação entra na auditoria como `kong.migrate`, com antes e depois. Rollbacks entram como `kong.rollback`.
+Every write is audited as `kong.migrate` with before and after; rollbacks as
+`kong.rollback`.
+
+## Development
+
+```bash
+cp .env.example .env     # then edit; never commit .env
+make dev                 # backend on :8080 + Vite on :5173 (proxies /api)
+make check               # everything CI runs: fmt-check, lint, test, vuln, secrets
+make help                # all targets
+```
+
+Repository layout:
+
+```
+cmd/apisix-dashboard/   main (serve, healthcheck, version) + user CLI
+internal/config         DASH_* configuration
+internal/server         HTTP API, auth middleware, security headers, SPA handler
+internal/auth           passwords, TOTP, sessions, lockout, roles
+internal/apisix         Admin API client, resource allowlist, masking, schema catalog
+internal/acme           ACME DNS-01 issuer and renewer (Cloudflare)
+internal/kong           Kong reader, translator, planner, applier with rollback
+internal/audit          audit trail
+internal/store          SQLite
+internal/secure         encryption, keys, random tokens
+internal/i18n           message codes for user-facing API errors
+internal/web            embedded web UI (generated from web/)
+web/                    React + TypeScript + Mantine
+deploy/                 Docker Swarm stack example
+```
+
+Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Roadmap
 
-- Login via OIDC (Keycloak), mantendo o login local como contingência
-- Plugin metadata na interface
-- Integração com o Swarm: descobrir serviços e sugerir upstreams
-- Histórico e rollback de configurações a partir da auditoria
+- OIDC (Keycloak) login, keeping local login as break-glass
+- Plugin metadata UI
+- Swarm integration: discover services and suggest upstreams
+- Configuration history and rollback from the audit trail
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE).

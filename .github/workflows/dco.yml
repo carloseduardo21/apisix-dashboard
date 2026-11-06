@@ -1,0 +1,43 @@
+name: DCO
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check Signed-off-by trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          fail=0
+          for sha in $(git rev-list --no-merges "${BASE_SHA}..${HEAD_SHA}"); do
+            author="$(git log -1 --format='%an <%ae>' "$sha")"
+            email="$(git log -1 --format='%ae' "$sha")"
+            case "$email" in
+              *'[bot]@users.noreply.github.com') continue ;;
+            esac
+            if ! git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$sha" | grep -qiF "<${email}>"; then
+              echo "::error::Commit ${sha:0:12} by ${author} has no matching Signed-off-by trailer"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Sign off your commits: git rebase --signoff \"${BASE_SHA}\" && git push --force-with-lease"
+            echo "See CONTRIBUTING.md#developer-certificate-of-origin"
+            exit 1
+          fi
+          echo "All commits are signed off."

@@ -1,0 +1,64 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security vulnerabilities must not be reported here**: use
+        [private reporting](https://github.com/carloseduardo21/apisix-dashboard/security/advisories/new).
+        Remove admin keys, passwords, tokens, certificates and internal hostnames from
+        everything you paste.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Log in as an operator
+        2. Open Routes → Create
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Lintel version
+      description: Output of `apisix-dashboard version`, or the commit.
+    validations:
+      required: true
+  - type: input
+    id: apisix
+    attributes:
+      label: Apache APISIX version
+      placeholder: "3.14.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: Deployment
+      options:
+        - Binary
+        - Docker
+        - Docker Swarm
+        - Kubernetes
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser (for UI issues)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Server logs (redacted). Rendered as code.
+      render: text

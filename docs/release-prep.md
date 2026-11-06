@@ -1,7 +1,7 @@
 # Open-source release preparation — status
 
 Tracking document for preparing **Lintel for Apache APISIX** for publication on
-GitHub (`github.com/carloseduardo21/apisix-dashboard`, private first, then public).
+GitHub (`github.com/carloseduardo21/apisix-dashboard`, public since 2026-11-05).
 Each phase is approved by the maintainer before the next one starts.
 
 ## Phases
@@ -13,8 +13,8 @@ Each phase is approved by the maintainer before the next one starts.
 | 2 | Claude Code context and rules (`.claude/`, `CLAUDE.md` files) | ✅ done |
 | 3 | Local tooling (Makefile, golangci-lint, Oxlint, Prettier, scanners) + all lint findings fixed | ✅ done |
 | 4 | CI/CD (CI, CodeQL, Trivy, Dependabot, Scorecard) + UI i18n (en, pt-BR, es) | ✅ done |
-| 5 | Governance and docs (README, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, CODEOWNERS, templates, licence options) | ⏳ next |
-| 6 | Releases and supply chain (release-please, GoReleaser, GHCR multi-arch, SBOM, cosign) | pending |
+| 5 | Governance and docs (README, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, CODEOWNERS, templates, licence) | ✅ done |
+| 6 | Releases and supply chain (release-please, GoReleaser, GHCR multi-arch, SBOM, cosign) | ⏳ next |
 | 7 | Application security review → `docs/security-review.md` | pending |
 
 ## Decisions taken
@@ -29,22 +29,23 @@ Each phase is approved by the maintainer before the next one starts.
 - Frontend lint is **Oxlint** + Prettier (typescript-eslint does not support TS 7).
 - Conventional Commits; Claude commits at the end of each approved phase.
 - Git history was empty when the work started: no history rewrite was needed.
+- Licence **Apache-2.0**; contributions under the **DCO** (no CLA); public contact
+  only through GitHub (private vulnerability reporting, no e-mail in the repo).
+- TOTP issuer is **Lintel** for new MFA enrollments (existing ones keep the old name).
+- Repository settings: Dependabot alerts and private vulnerability reporting enabled;
+  `main` protected (required CI checks, linear history, no force-push/deletion,
+  admins may bypass for direct maintainer pushes).
 
 ## Pending questions for the maintainer
 
-1. **Licence** (Phase 5): options (Apache-2.0, MIT, AGPL-3.0, dual licensing…) will
-   be presented with pros and cons, considering future monetization. Not chosen yet.
-2. **TOTP issuer**: still "APISIX Dashboard" in authenticator apps. Switch new
-   enrollments to "Lintel"?
-3. Phase 7 will detail the risks found in Phase 0, e.g. operators can enable
+1. Phase 7 will detail the risks found in Phase 0, e.g. operators can enable
    dangerous plugins (`serverless-*`), SSRF through upstream nodes / secret URIs,
    per-account-only login lockout (no IP rate limit), spoofable `X-Forwarded-For`
    in the audit trail. No fix is applied without approval.
 
-## Notes for when the repository is created
+## Follow-ups
 
-- No git remote is configured yet; push `main` after creating the GitHub repo.
-- CodeQL, SARIF uploads and Scorecard only run on a **public** repository (code
-  scanning on private repos requires GitHub Advanced Security).
-- Recommended settings: branch protection on `main` with the CI checks required,
-  private vulnerability reporting enabled, Dependabot alerts enabled.
+- Add the `DCO sign-off` check to the required status checks of `main` after it has
+  run once on a pull request.
+- Consider allowing only squash merges (keeps Conventional Commit titles as the
+  changelog source for release-please in Phase 6).

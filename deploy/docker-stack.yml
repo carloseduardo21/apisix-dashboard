@@ -1,18 +1,18 @@
-# Exemplo de deploy no Docker Swarm.
+# Example Docker Swarm deployment of Lintel for Apache APISIX.
 #
 #   openssl rand -hex 32 | docker secret create dashboard_encryption_key -
-#   printf '%s' 'SUA_ADMIN_KEY' | docker secret create apisix_admin_key -
+#   printf '%s' 'change-me' | docker secret create apisix_admin_key -
 #   docker secret create dashboard_tls_cert cert.pem
 #   docker secret create dashboard_tls_key key.pem
-#   printf '%s' 'TOKEN_CLOUDFLARE' | docker secret create cloudflare_dns_token -   # opcional: certificados automáticos
+#   printf '%s' 'change-me' | docker secret create cloudflare_dns_token -   # optional: automatic certificates
 #   docker stack deploy -c deploy/docker-stack.yml apisix-dashboard
 #
-# Primeiro admin:
+# First admin:
 #   docker exec -it $(docker ps -qf name=apisix-dashboard_dashboard) /apisix-dashboard user add -u admin -r admin
 
 services:
   dashboard:
-    image: registry.interno/apisix-dashboard:0.1.0
+    image: registry.example.com/apisix-dashboard:0.1.0   # build with `make docker` and push to your registry
     environment:
       DASH_ADMIN_API_URL: http://apisix:9180
       DASH_ADMIN_API_KEY_FILE: /run/secrets/apisix_admin_key
@@ -20,12 +20,12 @@ services:
       DASH_LISTEN_ADDR: ":8443"
       DASH_TLS_CERT_FILE: /run/secrets/dashboard_tls_cert
       DASH_TLS_KEY_FILE: /run/secrets/dashboard_tls_key
-      # Certificados automáticos (Let's Encrypt DNS-01 via Cloudflare). Remova
-      # estas linhas e o secret abaixo se não for usar.
+      # Automatic certificates (Let's Encrypt DNS-01 via Cloudflare). Remove
+      # these lines and the secret below if you do not use them.
       DASH_ACME_CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cloudflare_dns_token
-      DASH_ACME_EMAIL: infra@exemplo.com.br
-      # Migração do Kong (só leitura na Admin API do Kong). Descomente durante a
-      # migração; o secret só é necessário se a Admin API exigir token.
+      DASH_ACME_EMAIL: admin@example.com
+      # Kong migration (read-only access to the Kong Admin API). Uncomment during
+      # the migration; the secret is only needed if the Admin API requires a token.
       # DASH_KONG_ADMIN_URL: http://kong-admin:8001
       # DASH_KONG_ADMIN_TOKEN_FILE: /run/secrets/kong_admin_token
     secrets:
@@ -41,10 +41,10 @@ services:
     ports:
       - target: 8443
         published: 8443
-        mode: host   # preserva o IP real do cliente na auditoria
+        mode: host   # keeps the real client IP in the audit trail
     deploy:
-      # O estado (usuários, sessões, auditoria) fica em SQLite: uma réplica só,
-      # fixada no nó que guarda o volume.
+      # State (users, sessions, audit) lives in SQLite: exactly one replica,
+      # pinned to the node that holds the volume.
       replicas: 1
       placement:
         constraints:
@@ -57,7 +57,7 @@ volumes:
   dashboard-data:
 
 networks:
-  # Rede overlay onde a Admin API (porta 9180) do APISIX está acessível.
+  # Overlay network where the APISIX Admin API (port 9180) is reachable.
   apisix-admin:
     external: true
 

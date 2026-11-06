@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/carloseduardo21/apisix-dashboard/security/advisories/new
+    about: Never report vulnerabilities in public issues. Use private reporting.
