@@ -112,7 +112,7 @@ func open(auditOut io.Writer) (*state, error) {
 	}
 	al := audit.New(st, auditOut)
 	svc := auth.NewService(st, aead, al, auth.Config{
-		Issuer:             "APISIX Dashboard",
+		Issuer:             "Lintel",
 		SessionIdleTimeout: cfg.SessionIdleTimeout,
 		SessionMaxLifetime: cfg.SessionMaxLifetime,
 		PendingTimeout:     5 * time.Minute,

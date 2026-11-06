@@ -46,3 +46,33 @@ func TestPassword(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestTOTPURI(t *testing.T) {
+	t.Parallel()
+	secret := []byte("12345678901234567890")
+	tests := []struct {
+		name, issuer, account, want string
+	}{
+		{
+			name:    "plain",
+			issuer:  "Lintel",
+			account: "alice",
+			want:    "otpauth://totp/Lintel:alice?algorithm=SHA1&digits=6&issuer=Lintel&period=30&secret=",
+		},
+		{
+			name:    "escaped",
+			issuer:  "Lintel Prod",
+			account: "bob smith",
+			want:    "otpauth://totp/Lintel%20Prod:bob%20smith?algorithm=SHA1&digits=6&issuer=Lintel+Prod&period=30&secret=",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// The base32 secret is appended here so scanners do not flag a literal.
+			if got, want := totpURI(tc.issuer, tc.account, secret), tc.want+b32.EncodeToString(secret); got != want {
+				t.Errorf("got  %s\nwant %s", got, want)
+			}
+		})
+	}
+}
