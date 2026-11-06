@@ -852,20 +852,63 @@ func headerExpr(name string, values []string) any {
 	return or(exprs)
 }
 
+// literalPrefix returns the literal text every match of the (start
+// anchored) regex rx begins with, or "" when there is no safe prefix:
+// alternation, inline flags and groups at the start make it unknowable, and a
+// literal followed by ?, * or {...} may be absent or repeated, so it is not
+// included. Non-ASCII regexes get no prefix.
+func literalPrefix(rx string) string {
+	if strings.Contains(rx, "|") || strings.HasPrefix(rx, "(") {
+		return ""
+	}
+	for i := 0; i < len(rx); i++ {
+		if rx[i] >= 0x80 {
+			return "" // keep the byte-wise scan below ASCII-only
+		}
+	}
+	var b strings.Builder
+	for i := 0; i < len(rx); i++ {
+		c := rx[i]
+		var lit byte
+		width := 1
+		switch {
+		case c == '\\' && i+1 < len(rx) && !isRegexClassLetter(rx[i+1]):
+			lit, width = rx[i+1], 2 // escaped punctuation: \/ \. \-
+		case strings.IndexByte(`\.^$*+?()[]{}|`, c) >= 0:
+			return b.String()
+		default:
+			lit = c
+		}
+		if next := i + width; next < len(rx) && strings.IndexByte("?*{", rx[next]) >= 0 {
+			return b.String() // this literal may be absent
+		}
+		b.WriteByte(lit)
+		i += width - 1
+	}
+	return b.String()
+}
+
+// isRegexClassLetter reports whether \c is a class or assertion (\d, \w,
+// \b...) rather than an escaped literal.
+func isRegexClassLetter(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+}
+
 // paths translates Kong paths. Kong matches plain paths by prefix and "~"
 // paths as regexes anchored at the start; strip_path removes the matched
 // part and the service path is prepended (path_handling v0).
 func paths(r *Route, svcPath string, it *Item) (uris []string, vars any, regexURI []string) {
 	type kp struct {
-		re    string // anchored regex matching the path prefix
-		plain string
-		regex bool
+		re     string // anchored regex matching the path prefix
+		plain  string
+		regex  bool
+		prefix string // literal prefix every match of a regex path starts with
 	}
 	var list []kp
 	for _, p := range r.Paths {
 		if rx, ok := strings.CutPrefix(p, "~"); ok {
 			rx = strings.TrimPrefix(rx, "^")
-			list = append(list, kp{re: "^(?:" + rx + ")", regex: true})
+			list = append(list, kp{re: "^(?:" + rx + ")", regex: true, prefix: literalPrefix(rx)})
 		} else {
 			list = append(list, kp{re: "^" + regexp.QuoteMeta(strings.TrimSuffix(p, "/")), plain: p})
 		}
@@ -875,10 +918,26 @@ func paths(r *Route, svcPath string, it *Item) (uris []string, vars any, regexUR
 	case len(list) == 0:
 		uris = []string{"/*"}
 	case anyRegex:
-		uris = []string{"/*"}
+		// Regexes cannot go in uris: match their literal prefix there and the
+		// full regex in vars. A specific prefix keeps APISIX precedence (the
+		// longest uri wins) close to Kong, where regex paths are evaluated
+		// before plain ones; "/*" would lose to any plain prefix route.
 		var exprs []any
 		for _, k := range list {
 			exprs = append(exprs, []any{"uri", "~~", k.re})
+			u := k.plain
+			if k.regex {
+				u = k.prefix
+			}
+			if u == "" {
+				u = "/"
+			}
+			if u = strings.TrimSuffix(u, "*") + "*"; !slices.Contains(uris, u) {
+				uris = append(uris, u)
+			}
+		}
+		if slices.Contains(uris, "/*") {
+			uris = []string{"/*"} // covers every other prefix
 		}
 		vars = or(exprs)
 	default:

@@ -183,7 +183,7 @@ func TestRouteTranslation(t *testing.T) {
 
 	// Regex path, header match, https only with redirect.
 	r2 := find(items, KindRoute, "r2")
-	expect(t, r2, "uris", []string{"/*"})
+	expect(t, r2, "uris", []string{"/pedidos/*"})
 	expect(t, r2, "vars", []any{
 		[]any{"http_x_versao", "in", []any{"2", "3"}},
 		[]any{"uri", "~~", `^(?:/pedidos/(?<id>\d+)$)`},
@@ -353,6 +353,54 @@ func TestSettingsValidate(t *testing.T) {
 	for _, want := range []string{"kong.settings.id_prefix", "kong.settings.label_reserved", "kong.settings.label_value", "kong.settings.rewrite_to", "kong.settings.rule_apisix_plugin"} {
 		if !codes[want] {
 			t.Errorf("missing %q in %v", want, msgs)
+		}
+	}
+}
+
+func TestLiteralPrefix(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		`/ecom/v1/tokens/[A-z0-9_-]*$`: "/ecom/v1/tokens/",
+		`/pedidos/(?<id>\d+)$`:         "/pedidos/",
+		`/files\.v2/\d+`:               "/files.v2/",
+		`/api/v1$`:                     "/api/v1",
+		`/colou?r`:                     "/colo",
+		`/a+b`:                         "/a",
+		`/ab*`:                         "/a",
+		`/ab{2}`:                       "/a",
+		`/x/\w+`:                       "/x/",
+		`/a|/b`:                        "",
+		`(?i)/admin`:                   "",
+		`(/a|/b)/x`:                    "",
+		`.*`:                           "",
+		`/café/x`:                      "",
+	}
+	for rx, want := range tests {
+		if got := literalPrefix(rx); got != want {
+			t.Errorf("literalPrefix(%q) = %q, want %q", rx, got, want)
+		}
+	}
+}
+
+func TestRegexPathURIs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		paths []string
+		want  []string
+	}{
+		{"regex gets its literal prefix", []string{`~/ecom/v1/tokens/[A-z0-9_-]*$`}, []string{"/ecom/v1/tokens/*"}},
+		{"regex and plain paths", []string{`~/a/\d+$`, "/b"}, []string{"/a/*", "/b*"}},
+		{"same prefix once", []string{`~/a/\d+$`, `~/a/[a-z]+$`}, []string{"/a/*"}},
+		{"no safe prefix falls back to /*", []string{`~(?i)/admin`, "/b"}, []string{"/*"}},
+	}
+	for _, tc := range tests {
+		uris, vars, _ := paths(&Route{Paths: tc.paths}, "", &Item{})
+		if strings.Join(uris, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("%s: uris %v, want %v", tc.name, uris, tc.want)
+		}
+		if vars == nil {
+			t.Errorf("%s: the full regex must stay in vars", tc.name)
 		}
 	}
 }
