@@ -44,6 +44,21 @@ func isSensitive(key, parent string, topSSL bool) bool {
 	return false
 }
 
+// looksLikeSSL reports whether v has the shape of an SSL object (a
+// certificate with its private key), so its keys are masked even when it is
+// returned for another resource. Defense in depth: paths are validated, but a
+// private key must never depend on that alone.
+func looksLikeSSL(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, cert := m["cert"]
+	_, key := m["key"]
+	_, keys := m["keys"]
+	return cert && (key || keys)
+}
+
 // References to APISIX secret managers are not secrets themselves.
 func isReference(s string) bool {
 	return strings.HasPrefix(s, "$secret://") || strings.HasPrefix(s, "$env://")
@@ -57,7 +72,7 @@ type EncryptFieldsFunc func(plugin string) [][]string
 // fields matched by the static rules above plus, for each plugin in
 // "plugins", the encrypt_fields declared by APISIX.
 func Mask(resource string, v any, enc EncryptFieldsFunc) any {
-	out := maskValue(v, resource == "ssls", "")
+	out := maskValue(v, resource == "ssls" || looksLikeSSL(v), "")
 	if enc == nil {
 		return out
 	}

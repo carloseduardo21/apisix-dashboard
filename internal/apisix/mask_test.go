@@ -2,6 +2,7 @@ package apisix
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -87,7 +88,12 @@ func TestParsePath(t *testing.T) {
 			t.Errorf("%q should be valid", p)
 		}
 	}
-	bad := []string{"", "plugins/list", "routes/1/2", "routes/../ssls", "routes/a%2Fb", "consumers/jack/x", "unknown/1", "routes/a b"}
+	bad := []string{
+		"", "plugins/list", "routes/1/2", "routes/../ssls", "routes/a%2Fb", "consumers/jack/x", "unknown/1", "routes/a b",
+		// Dot segments (reach the handler percent-encoded) would escape the resource.
+		"routes/..", "routes/.", "secrets/../ssls", "secrets/./1", "secrets/vault/..",
+		"consumers/../credentials/x", "consumers/jack/credentials/..", "consumers/./credentials/c1",
+	}
 	for _, p := range bad {
 		if _, valid := ParsePath(p); valid {
 			t.Errorf("%q should be rejected", p)
@@ -122,5 +128,39 @@ func TestMaskEncryptFields(t *testing.T) {
 	}
 	if !strings.Contains(s, "http://loki") || !strings.Contains(s, `"name":"b"`) {
 		t.Errorf("non-sensitive data lost: %s", s)
+	}
+}
+
+func TestMaskSSLShapeForAnyResource(t *testing.T) {
+	t.Parallel()
+	pem := `-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----` // JSON-escaped newlines
+	tests := []struct {
+		name, resource, body string
+		masked               []string // top-level fields that must be masked
+		kept                 []string // top-level fields that must be kept
+	}{
+		{"ssl resource", "ssls", `{"cert":"C","key":"` + pem + `","keys":["` + pem + `"]}`, []string{"key", "keys"}, []string{"cert"}},
+		{"ssl shape under another resource", "secrets", `{"cert":"C","key":"` + pem + `"}`, []string{"key"}, []string{"cert"}},
+		{"ssl shape with keys only", "routes", `{"cert":"C","keys":["` + pem + `"]}`, []string{"keys"}, []string{"cert"}},
+		{"plain key field is not an ssl", "secrets", `{"key":"vault-path","uri":"http://vault"}`, nil, []string{"key", "uri"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out, ok := Mask(tc.resource, decode(t, tc.body), nil).(map[string]any)
+			if !ok {
+				t.Fatal("expected an object")
+			}
+			for _, f := range tc.masked {
+				if s := fmt.Sprint(out[f]); strings.Contains(s, "PRIVATE KEY") {
+					t.Errorf("%s: %s not masked: %v", tc.name, f, out[f])
+				}
+			}
+			for _, f := range tc.kept {
+				if s := fmt.Sprint(out[f]); strings.Contains(s, Masked) {
+					t.Errorf("%s: %s should not be masked: %v", tc.name, f, out[f])
+				}
+			}
+		})
 	}
 }

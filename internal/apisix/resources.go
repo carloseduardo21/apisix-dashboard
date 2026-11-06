@@ -40,7 +40,11 @@ func ParsePath(raw string) (Path, bool) {
 	}
 	rest := segs[1:]
 	for _, s := range rest {
-		if !segmentRe.MatchString(s) {
+		// "." and ".." would be resolved by APISIX (nginx normalizes the URI),
+		// escaping the allowlisted resource: "secrets/../ssls" reaches the SSL
+		// list. They arrive here percent-encoded (%2e, %2F), which ServeMux does
+		// not clean, so they must be rejected explicitly.
+		if !segmentRe.MatchString(s) || s == "." || s == ".." {
 			return Path{}, false
 		}
 	}
