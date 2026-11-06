@@ -118,6 +118,8 @@ func open(auditOut io.Writer) (*state, error) {
 		PendingTimeout:     5 * time.Minute,
 		MaxLoginAttempts:   cfg.MaxLoginAttempts,
 		LockoutDuration:    cfg.LockoutDuration,
+		// Each argon2id hash uses 64 MiB: size memory limits accordingly.
+		MaxConcurrentHashes: cfg.LoginConcurrency,
 	})
 	return &state{cfg: cfg, store: st, audit: al, auth: svc, aead: aead}, nil
 }
@@ -134,6 +136,7 @@ func auditWriter() (io.Writer, error) {
 }
 
 func serve() error {
+	setMemoryLimit()
 	out, err := auditWriter()
 	if err != nil {
 		return fmt.Errorf("audit log: %w", err)
@@ -174,18 +177,20 @@ func serve() error {
 		})
 	}
 	srv := server.New(server.Options{
-		Store:        st.store,
-		Auth:         st.auth,
-		APISIX:       client,
-		Catalog:      catalog,
-		ACME:         issuer,
-		Kong:         migrator,
-		Audit:        st.audit,
-		Static:       web.FS(),
-		CookieSecure: cfg.CookieSecure,
-		TrustProxy:   cfg.TrustProxyHeaders,
-		TLS:          cfg.TLSCertFile != "",
-		Version:      version,
+		Store:              st.store,
+		Auth:               st.auth,
+		APISIX:             client,
+		Catalog:            catalog,
+		ACME:               issuer,
+		Kong:               migrator,
+		Audit:              st.audit,
+		Static:             web.FS(),
+		CookieSecure:       cfg.CookieSecure,
+		TrustProxy:         cfg.TrustProxyHeaders,
+		TrustedProxies:     cfg.TrustedProxies,
+		LoginRatePerMinute: cfg.LoginRatePerMinute,
+		TLS:                cfg.TLSCertFile != "",
+		Version:            version,
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

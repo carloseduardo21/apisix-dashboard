@@ -747,6 +747,7 @@
     },
     "auth": {
       "admin_only": "acceso restringido a administradores",
+      "busy": "el servidor está ocupado; inténtelo de nuevo en un momento",
       "credentials_required": "introduce usuario y contraseña",
       "csrf_invalid": "token CSRF no válido",
       "current_password_wrong": "contraseña actual incorrecta",
@@ -762,7 +763,8 @@
       "password_too_long": "la contraseña debe tener como máximo {max} caracteres",
       "password_too_short": "la contraseña debe tener al menos {min} caracteres",
       "read_only_role": "tu rol no permite cambios",
-      "session_expired": "sesión caducada"
+      "session_expired": "sesión caducada",
+      "too_many_requests": "demasiados intentos; inténtelo de nuevo en {seconds} segundos"
     },
     "kong": {
       "admin_api_error": "error en la Admin API: {detail}",

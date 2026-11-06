@@ -90,8 +90,11 @@ Every secret also accepts a `_FILE` suffix (Docker/Swarm secrets).
 | `DASH_SESSION_MAX_LIFETIME` | `12h` | Absolute session lifetime |
 | `DASH_MAX_LOGIN_ATTEMPTS` | `6` | Failed password or MFA attempts before lockout (PCI 8.3.4: at most 10) |
 | `DASH_LOCKOUT_DURATION` | `30m` | Lockout duration (PCI 8.3.4: at least 30 minutes) |
+| `DASH_LOGIN_RATE_PER_MINUTE` | `20` | Password, MFA and password-change attempts allowed per client IP per minute (IPv6 grouped by /64); excess gets `429` |
+| `DASH_LOGIN_CONCURRENCY` | `2` | Password hashes computed at the same time. Each argon2id hash uses 64 MiB: allow about `64 MiB × this + 64 MiB` of memory |
 | `DASH_COOKIE_SECURE` | `true` | Send the session cookie over HTTPS only |
-| `DASH_TRUST_PROXY_HEADERS` | `false` | Use `X-Forwarded-For` / `X-Real-IP` for the audit IP (only behind a trusted proxy) |
+| `DASH_TRUSTED_PROXIES` | — | Comma-separated CIDRs/addresses of reverse proxies allowed to set `X-Forwarded-For` / `X-Real-IP`. The client IP (audit, sessions, rate limiting) is the rightmost address that is not one of them |
+| `DASH_TRUST_PROXY_HEADERS` | `false` | **Deprecated**, use `DASH_TRUSTED_PROXIES`. When `true` without a list, only the direct peer is trusted (rightmost `X-Forwarded-For` entry) |
 | `DASH_AUDIT_LOG` | `stdout` | Audit mirror as JSON lines: `stdout`, `none` or a file path |
 | `DASH_ACME_CLOUDFLARE_API_TOKEN` / `_FILE` | — | Enables automatic certificates |
 | `DASH_ACME_EMAIL` | — | Let's Encrypt account contact (optional) |
@@ -107,7 +110,8 @@ Every secret also accepts a `_FILE` suffix (Docker/Swarm secrets).
 | `DASH_KONG_CA_FILE` | — | CA bundle for an HTTPS Kong Admin API |
 | `DASH_KONG_TIMEOUT` | `30s` | Kong call timeout |
 
-Outbound requests honour `HTTPS_PROXY`. The server logs a warning at startup for
+In a container, the Go memory limit is set to 85% of the cgroup memory limit unless
+`GOMEMLIMIT` is set. Outbound requests honour `HTTPS_PROXY`. The server logs a warning at startup for
 every setting that deviates from PCI DSS defaults.
 
 ## Roles
@@ -128,7 +132,7 @@ The last enabled admin cannot be removed, demoted or disabled.
 | 7.2: least privilege | `viewer`, `operator` and `admin` roles enforced in the backend. Only allowlisted Admin API resources are reachable |
 | 8.2.8: session timeout | 15 min idle timeout and 12 h absolute lifetime. Sessions are server-side and tokens are stored hashed |
 | 8.3.1 / 8.4: MFA | Mandatory TOTP (RFC 6238) for every user, with replay protection. Secrets encrypted with AES-256-GCM |
-| 8.3.4: account lockout | 30 min lockout after 6 failed password or MFA attempts |
+| 8.3.4: account lockout | 30 min lockout after 6 failed password or MFA attempts, plus per-IP throttling of authentication attempts (audited as `auth.throttled`) so password spraying is slowed down |
 | 8.3.5: first-use passwords | Passwords set by an admin are temporary and must be changed at first login |
 | 8.3.6 / 8.3.7: passwords | At least 12 characters with letters and digits, must not contain the username, cannot reuse the last 4. Hashed with argon2id |
 | 10.2: audit trail | Logins, logouts, failures, lockouts, MFA, user management (UI and CLI) and every APISIX change, with **before and after**, actor, IP and outcome |

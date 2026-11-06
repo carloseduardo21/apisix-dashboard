@@ -83,7 +83,12 @@ deploy/                 Docker Swarm stack example
 - Passwords set by an admin are temporary → **forced change on first access**.
 - Password policy: ≥12 chars, letters + digits, must not contain the username, cannot
   reuse the last 4 (PCI 8.3.6/8.3.7).
-- **Account lockout** after N failed password/MFA attempts (default 6, 30 min).
+- **Account lockout** after N failed password/MFA attempts (default 6, 30 min), plus
+  **per-IP throttling** of login/MFA/password-change (`DASH_LOGIN_RATE_PER_MINUTE`,
+  429 + `auth.throttled` audit) and a cap on concurrent argon2id hashes
+  (`DASH_LOGIN_CONCURRENCY`); Go memory limit derived from the cgroup limit.
+- Client IP from `X-Forwarded-For` only via `DASH_TRUSTED_PROXIES` (rightmost
+  untrusted hop); `DASH_TRUST_PROXY_HEADERS` is deprecated (direct peer only).
 - **Server-side sessions**: token stored hashed (SHA-256), idle timeout 15 min, max
   lifetime 12 h, pending-MFA timeout 5 min, background janitor purges expired ones.
   Cookie `HttpOnly`, `Secure`, `SameSite=Strict`; session id rotated at login.

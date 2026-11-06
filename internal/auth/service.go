@@ -20,7 +20,13 @@ var (
 	ErrInvalidCode        = i18n.E("auth.invalid_mfa_code", "invalid MFA code")
 	ErrSessionExpired     = i18n.E("auth.session_expired", "session expired")
 	ErrMFAState           = i18n.E("auth.mfa_state", "MFA operation not allowed in this state")
+	// ErrBusy means every password hashing slot stayed taken too long.
+	ErrBusy = i18n.E("auth.busy", "the server is busy; try again in a moment")
 )
+
+// defaultHashWait is how long a request waits for a free password hashing
+// slot before ErrBusy.
+const defaultHashWait = 5 * time.Second
 
 type Config struct {
 	Issuer             string
@@ -29,6 +35,9 @@ type Config struct {
 	PendingTimeout     time.Duration // time allowed to complete MFA after the password step
 	MaxLoginAttempts   int
 	LockoutDuration    time.Duration
+	// MaxConcurrentHashes bounds concurrent argon2id computations (64 MiB
+	// each), so login floods cannot exhaust memory. Default 2.
+	MaxConcurrentHashes int
 }
 
 // Meta describes the client performing a request, for sessions and audit.
@@ -44,10 +53,17 @@ type Service struct {
 	cfg       Config
 	dummyHash string
 	now       func() time.Time
+	hashSlots chan struct{}
+	hashWait  time.Duration
 }
 
 func NewService(st *store.Store, aead *secure.AEAD, al *audit.Logger, cfg Config) *Service {
+	if cfg.MaxConcurrentHashes < 1 {
+		cfg.MaxConcurrentHashes = 2
+	}
 	return &Service{
+		hashSlots: make(chan struct{}, cfg.MaxConcurrentHashes),
+		hashWait:  defaultHashWait,
 		store:     st,
 		aead:      aead,
 		audit:     al,
@@ -59,6 +75,22 @@ func NewService(st *store.Store, aead *secure.AEAD, al *audit.Logger, cfg Config
 
 func (s *Service) Config() Config { return s.cfg }
 
+// withHashSlot runs fn while holding a password hashing slot. Every path that
+// hashes or verifies passwords on behalf of a request goes through it.
+func (s *Service) withHashSlot(ctx context.Context, fn func() error) error {
+	t := time.NewTimer(s.hashWait)
+	defer t.Stop()
+	select {
+	case s.hashSlots <- struct{}{}:
+	case <-t.C:
+		return ErrBusy
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-s.hashSlots }()
+	return fn()
+}
+
 func totpAD(userID int64) []byte       { return fmt.Appendf(nil, "totp:user:%d", userID) }
 func pendingAD(sessHash string) []byte { return []byte("totp:pending:" + sessHash) }
 
@@ -68,7 +100,15 @@ func (s *Service) record(ctx context.Context, actor string, m Meta, action, outc
 
 // Login checks the password and opens a session that still requires MFA.
 // It returns the raw session token to be set as a cookie.
-func (s *Service) Login(ctx context.Context, username, password string, m Meta) (string, *store.Session, *store.User, error) {
+func (s *Service) Login(ctx context.Context, username, password string, m Meta) (token string, sess *store.Session, u *store.User, err error) {
+	err = s.withHashSlot(ctx, func() error {
+		token, sess, u, err = s.login(ctx, username, password, m)
+		return err
+	})
+	return token, sess, u, err
+}
+
+func (s *Service) login(ctx context.Context, username, password string, m Meta) (string, *store.Session, *store.User, error) {
 	u, err := s.store.GetUserByUsername(ctx, username)
 	if errors.Is(err, store.ErrNotFound) {
 		VerifyPassword(password, s.dummyHash) // keep timing uniform
@@ -256,13 +296,17 @@ func (s *Service) Logout(ctx context.Context, sess *store.Session, u *store.User
 
 // ChangePassword is the self-service change. Other sessions are revoked.
 func (s *Service) ChangePassword(ctx context.Context, sess *store.Session, u *store.User, current, next string, m Meta) error {
+	return s.withHashSlot(ctx, func() error { return s.changePassword(ctx, sess, u, current, next, m) })
+}
+
+func (s *Service) changePassword(ctx context.Context, sess *store.Session, u *store.User, current, next string, m Meta) error {
 	if !VerifyPassword(current, u.PasswordHash) {
 		if err := s.registerFailure(ctx, u, m, "auth.password_change", "invalid current password"); err != nil {
 			return err
 		}
 		return validationErr("auth.current_password_wrong", "current password is incorrect")
 	}
-	if err := s.SetPassword(ctx, u, next, false); err != nil {
+	if err := s.setPassword(ctx, u, next, false); err != nil {
 		return err
 	}
 	s.record(ctx, u.Username, m, "auth.password_change", audit.Success, "")
@@ -272,6 +316,10 @@ func (s *Service) ChangePassword(ctx context.Context, sess *store.Session, u *st
 // SetPassword validates and stores a new password, rejecting the last
 // PasswordHistory passwords (PCI DSS 8.3.7).
 func (s *Service) SetPassword(ctx context.Context, u *store.User, pw string, mustChange bool) error {
+	return s.withHashSlot(ctx, func() error { return s.setPassword(ctx, u, pw, mustChange) })
+}
+
+func (s *Service) setPassword(ctx context.Context, u *store.User, pw string, mustChange bool) error {
 	if err := ValidatePassword(u.Username, pw); err != nil {
 		return err
 	}

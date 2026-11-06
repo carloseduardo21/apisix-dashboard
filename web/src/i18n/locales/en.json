@@ -747,6 +747,7 @@
     },
     "auth": {
       "admin_only": "restricted to administrators",
+      "busy": "the server is busy; try again in a moment",
       "credentials_required": "username and password are required",
       "csrf_invalid": "invalid CSRF token",
       "current_password_wrong": "current password is incorrect",
@@ -762,7 +763,8 @@
       "password_too_long": "the password must have at most {max} characters",
       "password_too_short": "the password must have at least {min} characters",
       "read_only_role": "your role does not allow changes",
-      "session_expired": "session expired"
+      "session_expired": "session expired",
+      "too_many_requests": "too many attempts; try again in {seconds} seconds"
     },
     "kong": {
       "admin_api_error": "Admin API error: {detail}",

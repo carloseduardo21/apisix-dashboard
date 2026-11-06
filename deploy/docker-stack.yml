@@ -42,6 +42,8 @@ services:
       - target: 8443
         published: 8443
         mode: host   # keeps the real client IP in the audit trail
+        # Behind a reverse proxy instead, publish nothing here and set
+        # DASH_TRUSTED_PROXIES to the proxy addresses.
     deploy:
       # State (users, sessions, audit) lives in SQLite: exactly one replica,
       # pinned to the node that holds the volume.
@@ -51,6 +53,8 @@ services:
           - node.labels.apisix-dashboard == true
       resources:
         limits:
+          # The Go heap is capped at 85% of this; each concurrent password
+          # hash (DASH_LOGIN_CONCURRENCY, default 2) uses 64 MiB.
           memory: 256M
 
 volumes:
