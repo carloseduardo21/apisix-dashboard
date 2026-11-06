@@ -149,6 +149,10 @@ deploy/                 Docker Swarm stack example
 - **Apply**: ordered writes (upstreams → services → consumers → credentials → routes →
   global rules), **automatic rollback** of the batch on failure, stale-plan protection
   (hash of Kong + APISIX state), idempotent re-runs, migration history.
+- **Revert** (History tab): preview + typed count confirmation (checked server-side,
+  stale-hash protected); deletes objects the migration created and restores replaced
+  ones from the audit trail (`kong.migrate` before/after), skips objects changed after
+  the migration unless included; secrets in originals → manual.
 - ~20 Kong plugins translated (auth, ACL, rate limiting, CORS, IP restriction,
   transformers, logging, cache, OIDC…).
 

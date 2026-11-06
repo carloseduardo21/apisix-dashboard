@@ -140,3 +140,22 @@ func TestMaskedSecretRedirectRejected(t *testing.T) {
 		t.Errorf("secret leaked in the response: %s", rec.Body.String())
 	}
 }
+
+func TestKongRevertRequiresWriteRole(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	viewer := h.login("viewer1", "viewer")
+	operator := h.login("operator1", "operator")
+	for _, path := range []string{"/api/migration/kong/revert/plan", "/api/migration/kong/revert"} {
+		if rec := h.do(&viewer, http.MethodPost, path, `{"record_ids":[1]}`); rec.Code != http.StatusForbidden {
+			t.Errorf("viewer %s: status %d, want 403", path, rec.Code)
+		}
+		if rec := h.do(nil, http.MethodPost, path, `{"record_ids":[1]}`); rec.Code != http.StatusUnauthorized {
+			t.Errorf("anonymous %s: status %d, want 401", path, rec.Code)
+		}
+		// Kong migration disabled in the harness: the operator gets past the role check.
+		if rec := h.do(&operator, http.MethodPost, path, `{"record_ids":[1]}`); rec.Code != http.StatusConflict {
+			t.Errorf("operator %s: status %d, want 409 (kong disabled)", path, rec.Code)
+		}
+	}
+}

@@ -104,6 +104,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/migration/kong/apply", s.require(access{write: true}, s.handleKongApply))
 	mux.HandleFunc("GET /api/migration/kong/job", s.require(access{write: true}, s.handleKongJob))
 	mux.HandleFunc("GET /api/migration/kong/history", s.require(access{write: true}, s.handleKongHistory))
+	mux.HandleFunc("POST /api/migration/kong/revert/plan", s.require(access{write: true}, s.handleKongRevertPlan))
+	mux.HandleFunc("POST /api/migration/kong/revert", s.require(access{write: true}, s.handleKongRevert))
 
 	// APISIX Admin API.
 	mux.HandleFunc("GET /api/status", s.require(access{}, s.handleStatus))

@@ -459,7 +459,28 @@
     "tab_settings": "Defaults",
     "title": "Kong migration",
     "untranslated_hint": "Objects that use them are blocked. Create a rule under <link>Defaults</link> to map or ignore each one.",
-    "untranslated_title": "Plugins without automatic translation"
+    "untranslated_title": "Plugins without automatic translation",
+    "history_select_last": "Select the last import",
+    "history_revert": "Revert selected ({count})",
+    "history_select_all": "Select all listed",
+    "history_select_row": "Select {name}",
+    "history_last_hint": "Records written by the same user with less than 2 minutes between them",
+    "revert": {
+      "title": "Revert migration · {count} selected",
+      "action_delete": "Delete",
+      "action_restore": "Restore original",
+      "action_manual": "Manual",
+      "action_missing": "Already gone",
+      "warning_title": "This changes APISIX immediately",
+      "warning": "Objects created by the migration are deleted and replaced objects are put back as they were before it. Enabled routes stop answering at once. Every change is recorded in the audit trail.",
+      "include_changed": "Also revert objects changed after the migration ({count})",
+      "include_changed_desc": "Changes made to them after the migration are lost.",
+      "changed": "changed after the migration",
+      "col_action": "What happens",
+      "confirm_label": "Type {count} to confirm",
+      "submit": "Revert ({count})",
+      "done": "Reverted: {ok} · failed: {failed} · skipped: {skipped}"
+    }
   },
   "login": {
     "back": "Back to sign in",
@@ -912,7 +933,16 @@
         "unsupported_plugins": "invalid policy for plugins without translation"
       },
       "stale": "Kong or APISIX changed since the preview; generate the preview again",
-      "unreachable": "could not reach the Kong Admin API: {detail}"
+      "unreachable": "could not reach the Kong Admin API: {detail}",
+      "revert": {
+        "selection": "select between 1 and {max} migrated objects",
+        "unknown_record": "migration record {id} does not exist (reload the history)",
+        "no_audit": "no migration write in the audit trail; revert it manually",
+        "unreadable_original": "the original object in the audit trail is unreadable; revert it manually",
+        "masked_original": "the original object had secrets, which the audit trail keeps masked; restore it manually from the audit trail",
+        "confirm": "confirmation mismatch: type {count} to revert {count} objects",
+        "failed": "{error}"
+      }
     },
     "users": {
       "already_exists": "user {username} already exists",

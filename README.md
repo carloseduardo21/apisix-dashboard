@@ -295,6 +295,26 @@ Known limitations:
 Every write is audited as `kong.migrate` with before and after; rollbacks as
 `kong.rollback`.
 
+**Reverting a migration** (History tab): select objects, or "Select the last import",
+and choose *Revert selected*. The preview shows, per object, what will happen, derived
+from the audit trail:
+
+- **delete**: the migration created it;
+- **restore original**: it replaced an existing object, which is put back;
+- **manual**: the original had secrets (kept masked in the audit trail), or there is
+  no migration write in the audit trail;
+- **already gone**: only the history record is removed.
+
+Objects changed in APISIX after their last migration write are skipped unless you
+include them explicitly. Objects are reverted dependents first (routes, credentials,
+consumers, services, upstreams). You confirm by typing the number of objects that will
+change; the server checks it and rejects the request if anything changed since the
+preview. Each change is audited as `kong.revert`, the batch as `kong.revert_batch`.
+
+Regex paths (`~...`) are matched in APISIX with their literal prefix in `uris`
+(e.g. `/ecom/v1/tokens/*`) and the full regex in `vars`, so plain prefix routes do not
+take precedence over them.
+
 ## Development
 
 ```bash

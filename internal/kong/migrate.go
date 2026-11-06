@@ -63,9 +63,10 @@ type Options struct {
 type Migrator struct {
 	Options
 
-	ctx context.Context
-	mu  sync.Mutex
-	job *Job
+	ctx       context.Context
+	mu        sync.Mutex
+	job       *Job
+	reverting bool // a revert is running (see Revert)
 }
 
 func NewMigrator(o Options) *Migrator {
@@ -426,7 +427,7 @@ func (m *Migrator) logf(level, code, template string, kv ...any) {
 // preview, writes it to APISIX in the background.
 func (m *Migrator) Apply(ctx context.Context, sel Selection, hash string, a Actor) (*Job, error) {
 	m.mu.Lock()
-	if m.job != nil && m.job.Status == JobRunning {
+	if m.job != nil && m.job.Status == JobRunning || m.reverting {
 		m.mu.Unlock()
 		return nil, ErrBusy
 	}

@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 	after       TEXT
 );
 CREATE INDEX IF NOT EXISTS audit_ts ON audit_events(ts);
+CREATE INDEX IF NOT EXISTS audit_resource ON audit_events(resource, resource_id);
 
 CREATE TABLE IF NOT EXISTS acme_accounts (
 	directory  TEXT PRIMARY KEY,
@@ -411,6 +412,45 @@ func (s *Store) ListAudit(ctx context.Context, limit int, beforeID int64) ([]*Au
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
 
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*AuditEvent{}
+	for rows.Next() {
+		var e AuditEvent
+		var ts int64
+		var before, after sql.NullString
+		if err := rows.Scan(&e.ID, &ts, &e.Actor, &e.IP, &e.Action, &e.Resource, &e.ResourceID, &e.Outcome, &e.Detail, &before, &after); err != nil {
+			return nil, err
+		}
+		e.Time = time.UnixMilli(ts)
+		if before.Valid {
+			e.Before = json.RawMessage(before.String)
+		}
+		if after.Valid {
+			e.After = json.RawMessage(after.String)
+		}
+		out = append(out, &e)
+	}
+	return out, rows.Err()
+}
+
+// ObjectHistory returns the successful audit events with the given actions
+// for one APISIX object, oldest first (used to find out how a migration
+// created or changed it).
+func (s *Store) ObjectHistory(ctx context.Context, resource, resourceID string, actions ...string) ([]*AuditEvent, error) {
+	if len(actions) == 0 {
+		return []*AuditEvent{}, nil
+	}
+	placeholders := "?" + strings.Repeat(", ?", len(actions)-1)
+	q := `SELECT id, ts, actor, ip, action, resource, resource_id, outcome, detail, before, after FROM audit_events
+		WHERE resource = ? AND resource_id = ? AND outcome = 'success' AND action IN (` + placeholders + `) ORDER BY id` // #nosec G202 -- only "?" placeholders are concatenated; every value is bound
+	args := []any{resource, resourceID}
+	for _, a := range actions {
+		args = append(args, a)
+	}
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err

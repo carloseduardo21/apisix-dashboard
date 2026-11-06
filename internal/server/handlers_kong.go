@@ -168,6 +168,7 @@ func (s *Server) handleKongJob(w http.ResponseWriter, r *http.Request, p *princi
 }
 
 type kongRecordView struct {
+	RecordID   int64     `json:"record_id"`
 	Kind       string    `json:"kind"`
 	KongID     string    `json:"kong_id"`
 	KongName   string    `json:"kong_name"`
@@ -188,8 +189,52 @@ func (s *Server) handleKongHistory(w http.ResponseWriter, r *http.Request, p *pr
 	}
 	out := make([]kongRecordView, 0, len(list))
 	for _, m := range list {
-		out = append(out, kongRecordView{Kind: m.Kind, KongID: m.KongID, KongName: m.KongName, Resource: m.Resource, ID: m.APISIXID,
+		out = append(out, kongRecordView{RecordID: m.ID, Kind: m.Kind, KongID: m.KongID, KongName: m.KongName, Resource: m.Resource, ID: m.APISIXID,
 			MigratedBy: m.MigratedBy, MigratedAt: m.MigratedAt})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+type kongRevertRequest struct {
+	RecordIDs      []int64 `json:"record_ids"`
+	Hash           string  `json:"hash"`
+	IncludeChanged bool    `json:"include_changed"`
+	Confirm        int     `json:"confirm"`
+}
+
+// handleKongRevertPlan previews how the selected migration records would be
+// undone (delete created objects, restore replaced ones).
+func (s *Server) handleKongRevertPlan(w http.ResponseWriter, r *http.Request, p *principal) {
+	if s.kongOff(w) {
+		return
+	}
+	var req kongRevertRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	plan, err := s.Kong.RevertPlan(r.Context(), req.RecordIDs)
+	if err != nil {
+		kongError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, plan)
+}
+
+// handleKongRevert undoes the selected migration records. The client sends
+// the preview hash and, as a confirmation, the number of objects that will
+// be deleted or restored.
+func (s *Server) handleKongRevert(w http.ResponseWriter, r *http.Request, p *principal) {
+	if s.kongOff(w) {
+		return
+	}
+	var req kongRevertRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	results, err := s.Kong.Revert(r.Context(), req.RecordIDs, req.Hash, req.IncludeChanged, req.Confirm, p.kongActor())
+	if err != nil {
+		kongError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }

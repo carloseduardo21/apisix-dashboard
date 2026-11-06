@@ -7,7 +7,9 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Code,
+  Group,
   Skeleton,
   Stack,
   Table,
@@ -19,6 +21,7 @@ import {
 import {
   IconAdjustments,
   IconAlertCircle,
+  IconArrowBackUp,
   IconHistory,
   IconListCheck,
   IconRefresh,
@@ -30,6 +33,7 @@ import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { Inventory } from './kong/Inventory'
 import { PreviewModal } from './kong/PreviewModal'
+import { RevertModal } from './kong/RevertModal'
 import { SettingsForm } from './kong/SettingsForm'
 import { KIND_LABEL, type KongInfo, type MigrationRecord, type Plan, type Selection } from './kong/types'
 import { Trans, useTranslation } from 'react-i18next'
@@ -51,9 +55,30 @@ DASH_KONG_ADMIN_TOKEN_FILE=/run/secrets/kong_admin_token   # ${t('kong.setup_tok
   )
 }
 
+// Records of one apply run: same user, less than this between writes.
+const RUN_GAP_MS = 2 * 60_000
+
+/** The records of the most recent import (the list is newest first). */
+function lastImport(records: MigrationRecord[]): number[] {
+  const out: number[] = []
+  let prev: MigrationRecord | undefined
+  for (const r of records) {
+    if (
+      prev &&
+      (r.migrated_by !== prev.migrated_by || Date.parse(prev.migrated_at) - Date.parse(r.migrated_at) > RUN_GAP_MS)
+    )
+      break
+    out.push(r.record_id)
+    prev = r
+  }
+  return out
+}
+
 function History() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [reverting, setReverting] = useState<number[] | null>(null)
   const q = useQuery({
     queryKey: ['kong', 'history'],
     queryFn: () => api<MigrationRecord[]>('GET', '/api/migration/kong/history'),
@@ -64,6 +89,28 @@ function History() {
       (r) => !s || r.kong_name.toLowerCase().includes(s) || r.id.toLowerCase().includes(s) || r.migrated_by.includes(s),
     )
   }, [q.data, query])
+  // Reverted records disappear from the history: keep only existing ones.
+  const existing = new Set((q.data ?? []).map((r) => r.record_id))
+  const selectedIds = [...selected].filter((id) => existing.has(id))
+  const toggle = (id: number) =>
+    setSelected((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  const allListed = rows.length > 0 && rows.every((r) => selected.has(r.record_id))
+  const someListed = rows.some((r) => selected.has(r.record_id))
+  const toggleAll = () =>
+    setSelected((s) => {
+      const n = new Set(s)
+      for (const r of rows) {
+        if (allListed) n.delete(r.record_id)
+        else n.add(r.record_id)
+      }
+      return n
+    })
+
   if (q.isPending) return <Skeleton h={200} />
   if (!q.data?.length)
     return (
@@ -73,18 +120,44 @@ function History() {
     )
   return (
     <Card>
-      <TextInput
-        placeholder={t('common.search')}
-        leftSection={<IconSearch size={16} />}
-        value={query}
-        onChange={(e) => setQuery(e.currentTarget.value)}
-        mb="md"
-        maw={360}
-      />
+      <Group justify="space-between" mb="md" gap="sm">
+        <TextInput
+          placeholder={t('common.search')}
+          leftSection={<IconSearch size={16} />}
+          value={query}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+          maw={360}
+          style={{ flex: 1 }}
+        />
+        <Group gap="sm">
+          <Tooltip label={t('kong.history_last_hint')}>
+            <Button variant="default" onClick={() => setSelected(new Set(lastImport(q.data)))}>
+              {t('kong.history_select_last')}
+            </Button>
+          </Tooltip>
+          <Button
+            color="red"
+            variant="light"
+            leftSection={<IconArrowBackUp size={16} />}
+            disabled={selectedIds.length === 0}
+            onClick={() => setReverting(selectedIds)}
+          >
+            {t('kong.history_revert', { count: selectedIds.length })}
+          </Button>
+        </Group>
+      </Group>
       <Table.ScrollContainer minWidth={640}>
         <Table verticalSpacing={6} fz="sm" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th w={36}>
+                <Checkbox
+                  aria-label={t('kong.history_select_all')}
+                  checked={allListed}
+                  indeterminate={someListed && !allListed}
+                  onChange={toggleAll}
+                />
+              </Table.Th>
               <Table.Th>{t('kong.col_when')}</Table.Th>
               <Table.Th>{t('kong.col_kind')}</Table.Th>
               <Table.Th>{t('kong.col_in_kong')}</Table.Th>
@@ -95,6 +168,13 @@ function History() {
           <Table.Tbody>
             {rows.map((r) => (
               <Table.Tr key={r.kind + r.kong_id}>
+                <Table.Td>
+                  <Checkbox
+                    aria-label={t('kong.history_select_row', { name: r.kong_name })}
+                    checked={selected.has(r.record_id)}
+                    onChange={() => toggle(r.record_id)}
+                  />
+                </Table.Td>
                 <Table.Td>{formatDateTime(r.migrated_at)}</Table.Td>
                 <Table.Td>
                   <Badge size="xs" variant="outline" color="gray">
@@ -117,6 +197,7 @@ function History() {
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>
+      <RevertModal recordIds={reverting ?? []} opened={!!reverting} onClose={() => setReverting(null)} />
     </Card>
   )
 }

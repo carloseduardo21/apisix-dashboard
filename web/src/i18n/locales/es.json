@@ -459,7 +459,28 @@
     "tab_settings": "Valores por defecto",
     "title": "Migración de Kong",
     "untranslated_hint": "Los objetos que los usan quedan bloqueados. Crea una regla en <link>Valores por defecto</link> para mapear o ignorar cada uno.",
-    "untranslated_title": "Plugins sin traducción automática"
+    "untranslated_title": "Plugins sin traducción automática",
+    "history_select_last": "Seleccionar la última importación",
+    "history_revert": "Revertir seleccionados ({count})",
+    "history_select_all": "Seleccionar todos los listados",
+    "history_select_row": "Seleccionar {name}",
+    "history_last_hint": "Registros escritos por el mismo usuario con menos de 2 minutos entre ellos",
+    "revert": {
+      "title": "Revertir migración · {count} seleccionados",
+      "action_delete": "Eliminar",
+      "action_restore": "Restaurar original",
+      "action_manual": "Manual",
+      "action_missing": "Ya no existe",
+      "warning_title": "Esto cambia APISIX de inmediato",
+      "warning": "Los objetos creados por la migración se eliminan y los objetos reemplazados vuelven a su estado anterior. Las rutas activas dejan de responder al instante. Cada cambio queda registrado en la auditoría.",
+      "include_changed": "Revertir también los objetos cambiados después de la migración ({count})",
+      "include_changed_desc": "Se pierden los cambios hechos en ellos después de la migración.",
+      "changed": "cambiado después de la migración",
+      "col_action": "Qué sucede",
+      "confirm_label": "Escriba {count} para confirmar",
+      "submit": "Revertir ({count})",
+      "done": "Revertidos: {ok} · fallos: {failed} · omitidos: {skipped}"
+    }
   },
   "login": {
     "back": "Volver al inicio de sesión",
@@ -912,7 +933,16 @@
         "unsupported_plugins": "política para plugins sin traducción no válida"
       },
       "stale": "Kong o APISIX cambiaron desde la vista previa; vuelve a generar la vista previa",
-      "unreachable": "no se pudo contactar con la Admin API de Kong: {detail}"
+      "unreachable": "no se pudo contactar con la Admin API de Kong: {detail}",
+      "revert": {
+        "selection": "seleccione entre 1 y {max} objetos migrados",
+        "unknown_record": "el registro de migración {id} no existe (recargue el historial)",
+        "no_audit": "no hay escritura de la migración en la auditoría; reviértalo manualmente",
+        "unreadable_original": "el objeto original en la auditoría es ilegible; reviértalo manualmente",
+        "masked_original": "el objeto original tenía secretos, que la auditoría guarda enmascarados; restáurelo manualmente desde la auditoría",
+        "confirm": "la confirmación no coincide: escriba {count} para revertir {count} objetos",
+        "failed": "{error}"
+      }
     },
     "users": {
       "already_exists": "el usuario {username} ya existe",

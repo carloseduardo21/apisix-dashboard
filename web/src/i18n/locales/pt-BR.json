@@ -459,7 +459,28 @@
     "tab_settings": "Padrões",
     "title": "Migração do Kong",
     "untranslated_hint": "Os objetos que os usam ficam bloqueados. Crie uma regra em <link>Padrões</link> para mapear ou ignorar cada um.",
-    "untranslated_title": "Plugins sem tradução automática"
+    "untranslated_title": "Plugins sem tradução automática",
+    "history_select_last": "Selecionar a última importação",
+    "history_revert": "Reverter selecionados ({count})",
+    "history_select_all": "Selecionar todos os listados",
+    "history_select_row": "Selecionar {name}",
+    "history_last_hint": "Registros gravados pelo mesmo usuário com menos de 2 minutos entre eles",
+    "revert": {
+      "title": "Reverter migração · {count} selecionados",
+      "action_delete": "Apagar",
+      "action_restore": "Restaurar original",
+      "action_manual": "Manual",
+      "action_missing": "Já não existe",
+      "warning_title": "Isto altera o APISIX imediatamente",
+      "warning": "Objetos criados pela migração são apagados e objetos substituídos voltam ao estado anterior a ela. Rotas ativas param de responder na hora. Cada alteração fica registrada na auditoria.",
+      "include_changed": "Reverter também objetos alterados após a migração ({count})",
+      "include_changed_desc": "As alterações feitas neles depois da migração serão perdidas.",
+      "changed": "alterado após a migração",
+      "col_action": "O que acontece",
+      "confirm_label": "Digite {count} para confirmar",
+      "submit": "Reverter ({count})",
+      "done": "Revertidos: {ok} · falhas: {failed} · ignorados: {skipped}"
+    }
   },
   "login": {
     "back": "Voltar ao login",
@@ -912,7 +933,16 @@
         "unsupported_plugins": "política para plugins sem tradução inválida"
       },
       "stale": "o Kong ou o APISIX mudou desde a pré-visualização; gere a pré-visualização de novo",
-      "unreachable": "não foi possível contactar a Admin API do Kong: {detail}"
+      "unreachable": "não foi possível contactar a Admin API do Kong: {detail}",
+      "revert": {
+        "selection": "selecione entre 1 e {max} objetos migrados",
+        "unknown_record": "o registro de migração {id} não existe (recarregue o histórico)",
+        "no_audit": "não há gravação da migração na auditoria; reverta manualmente",
+        "unreadable_original": "o objeto original na auditoria está ilegível; reverta manualmente",
+        "masked_original": "o objeto original tinha segredos, que a auditoria guarda mascarados; restaure manualmente a partir da auditoria",
+        "confirm": "confirmação não confere: digite {count} para reverter {count} objetos",
+        "failed": "{error}"
+      }
     },
     "users": {
       "already_exists": "o usuário {username} já existe",

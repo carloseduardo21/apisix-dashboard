@@ -1,3 +1,4 @@
+import type { ServerMessage } from '../../i18n/format'
 import type { Obj } from '../../schema/types'
 
 export type Kind = 'upstream' | 'service' | 'consumer' | 'credential' | 'route' | 'global_plugin'
@@ -106,6 +107,7 @@ export interface Job {
 }
 
 export interface MigrationRecord {
+  record_id: number
   kind: Kind
   kong_id: string
   kong_name: string
@@ -150,3 +152,29 @@ export const worstNote = (items: PlanItem[]) =>
     : items.some((i) => i.notes.some((n) => n.level === 'warn'))
       ? 'warn'
       : undefined
+
+export type RevertAction = 'delete' | 'restore' | 'manual' | 'missing'
+
+export interface RevertItem {
+  record_id: number
+  kind: Kind
+  kong_name: string
+  path: string
+  action: RevertAction
+  /** Modified in APISIX after the migration: only reverted when included. */
+  changed: boolean
+  reason?: ServerMessage
+}
+
+export interface RevertPlan {
+  items: RevertItem[]
+  hash: string
+}
+
+export interface RevertResult {
+  path: string
+  kind: Kind
+  action: RevertAction
+  outcome: 'success' | 'failure' | 'skipped'
+  error?: ServerMessage
+}
